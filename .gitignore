@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# Środowisko wirtualne
+.venv/
+venv/
+
+# Dane robocze aplikacji
+runtime/
+logs/
+*.log
+*.pid
+
+# Dane pomiarowe i pliki stanu
+state.json
+status*.txt
+
+# Sekrety
+.env
+.env.*
+secrets/
+config/secrets.toml
+
+# Edytory i system
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Android
+android/.gradle/
+android/local.properties
+android/**/build/

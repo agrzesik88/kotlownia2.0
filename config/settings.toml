@@ -1,0 +1,22 @@
+[application]
+name = "Kotlownia 2.0"
+simulation = true
+state_file = "runtime/state.json"
+
+[temperature]
+heating_available_c = 45.0
+read_interval_seconds = 10
+
+[pellet]
+trigger_gpio = 23
+echo_gpio = 24
+
+[relays]
+active_low = true
+cwu_circulation_gpio = 6
+boiler_loading_gpio = 13
+electric_heater_gpio = 19
+pellet_boiler_power_gpio = 26
+
+[automation]
+boiler_loading_seconds = 600
