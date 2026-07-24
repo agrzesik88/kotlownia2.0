@@ -21,6 +21,8 @@ class AutomationInput:
     monotonic_seconds: float
     electric_heater_requested: bool = False
     cwu_circulation_requested: bool = False
+    boiler_loading_requested: bool = False
+    pellet_boiler_power_override: bool | None = None
 
 
 @dataclass(slots=True, frozen=True)
@@ -75,8 +77,25 @@ class AutomationController:
         self._last_monotonic_seconds = inputs.monotonic_seconds
 
         pellet_low = inputs.pellet_level_percent <= self._pellet_low_level_percent
+        self._pellet_boiler_power_on = (
+            True if inputs.pellet_boiler_power_override is None
+            else inputs.pellet_boiler_power_override
+        )
 
         if self._state is BoilerState.BOOT:
+            self._state = BoilerState.IDLE
+
+        if inputs.boiler_loading_requested:
+            self._state = BoilerState.BOILER_LOADING
+            self._boiler_loading_started_at = None
+            return self._decision(
+                pellet_low=pellet_low,
+                cwu_circulation_on=inputs.cwu_circulation_requested,
+                boiler_loading_on=True,
+                reason="Pompa bojlera pracuje w trybie ręcznym",
+            )
+
+        if self._state is BoilerState.BOILER_LOADING and self._boiler_loading_started_at is None:
             self._state = BoilerState.IDLE
 
         if self._state is BoilerState.BOILER_LOADING:
@@ -202,7 +221,7 @@ class AutomationController:
             cwu_circulation_on=cwu_circulation_on,
             boiler_loading_on=boiler_loading_on,
             electric_heater_on=electric_heater_on,
-            pellet_boiler_power_on=True,
+            pellet_boiler_power_on=getattr(self, "_pellet_boiler_power_on", True),
             pellet_low=pellet_low,
             reason=reason,
         )

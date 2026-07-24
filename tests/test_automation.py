@@ -183,3 +183,33 @@ def test_cwu_schedule_request_is_forwarded_to_decision() -> None:
         )
     )
     assert decision.cwu_circulation_on is True
+
+
+def test_manual_boiler_loading_has_priority_over_heater() -> None:
+    controller = AutomationController()
+    decision = controller.evaluate(
+        AutomationInput(
+            pipe_temperature_c=20.0,
+            pellet_level_percent=75.0,
+            pellet_heating_detected=False,
+            monotonic_seconds=1.0,
+            electric_heater_requested=True,
+            boiler_loading_requested=True,
+        )
+    )
+    assert decision.boiler_loading_on is True
+    assert decision.electric_heater_on is False
+
+
+def test_pellet_boiler_power_can_be_overridden_off() -> None:
+    controller = AutomationController()
+    decision = controller.evaluate(
+        AutomationInput(
+            pipe_temperature_c=20.0,
+            pellet_level_percent=75.0,
+            pellet_heating_detected=False,
+            monotonic_seconds=1.0,
+            pellet_boiler_power_override=False,
+        )
+    )
+    assert decision.pellet_boiler_power_on is False

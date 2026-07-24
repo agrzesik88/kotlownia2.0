@@ -46,6 +46,10 @@ pellet_low_reminder_seconds = 86400
 enabled = true
 schedule_file = "runtime/schedule.json"
 
+[manual_control]
+enabled = true
+command_file = "runtime/manual_control.json"
+
 [history]
 enabled = true
 database_file = "runtime/history.db"

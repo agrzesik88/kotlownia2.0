@@ -10,7 +10,15 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict
 
 from controller.config import ControllerConfig, load_config
+from controller.manual import ManualControlRepository
 from controller.scheduler import ScheduleRepository, schedule_from_dict
+
+
+class ManualControlPayload(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    output: str
+    duration_minutes: int
 
 
 class SchedulePayload(BaseModel):
@@ -23,9 +31,12 @@ class SchedulePayload(BaseModel):
 
 def create_app(config_path: str | Path = "config/settings.toml") -> FastAPI:
     config = load_config(config_path)
-    app = FastAPI(title="Kotłownia 2.0", version="0.3.0")
+    app = FastAPI(title="Kotłownia 2.0", version="0.4.1")
     app.state.controller_config = config
     app.state.schedule_repository = ScheduleRepository(config.scheduler.schedule_file)
+    app.state.manual_repository = ManualControlRepository(
+        config.manual_control.command_file
+    )
 
     @app.get("/", include_in_schema=False)
     def dashboard() -> FileResponse:
@@ -59,6 +70,45 @@ def create_app(config_path: str | Path = "config/settings.toml") -> FastAPI:
             raise HTTPException(422, str(exc)) from exc
         app.state.schedule_repository.save(schedule)
         return schedule.to_dict()
+
+
+    @app.get("/api/manual")
+    def get_manual() -> dict[str, Any]:
+        decision = app.state.manual_repository.evaluate()
+        return {
+            "cwu_circulation_active": decision.cwu_circulation_requested,
+            "electric_heater_active": decision.electric_heater_requested,
+            "boiler_loading_active": decision.boiler_loading_requested,
+            "pellet_boiler_power_override": decision.pellet_boiler_power_override,
+            "cwu_circulation_until": decision.cwu_circulation_until,
+            "electric_heater_until": decision.electric_heater_until,
+            "boiler_loading_until": decision.boiler_loading_until,
+            "pellet_boiler_power_until": decision.pellet_boiler_power_until,
+        }
+
+    @app.post("/api/manual/activate")
+    def activate_manual(payload: ManualControlPayload) -> dict[str, Any]:
+        if not config.manual_control.enabled:
+            raise HTTPException(409, "Sterowanie ręczne jest wyłączone")
+        try:
+            state = app.state.manual_repository.activate(
+                payload.output, payload.duration_minutes
+            )
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+        return state.to_dict()
+
+    @app.post("/api/manual/deactivate/{output}")
+    def deactivate_manual(output: str) -> dict[str, Any]:
+        try:
+            state = app.state.manual_repository.deactivate(output)
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+        return state.to_dict()
+
+    @app.post("/api/manual/clear")
+    def clear_manual() -> dict[str, Any]:
+        return app.state.manual_repository.clear().to_dict()
 
     @app.get("/api/health")
     def health() -> dict[str, str]:

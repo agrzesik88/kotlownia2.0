@@ -24,6 +24,16 @@ class ControllerState:
     scheduler_enabled: bool = False
     cwu_schedule_active: bool = False
     electric_heater_schedule_active: bool = False
+    manual_control_enabled: bool = False
+    cwu_manual_active: bool = False
+    electric_heater_manual_active: bool = False
+    boiler_loading_manual_active: bool = False
+    pellet_boiler_power_manual_active: bool = False
+    pellet_boiler_power_manual_override: bool | None = None
+    cwu_manual_until: str | None = None
+    electric_heater_manual_until: str | None = None
+    boiler_loading_manual_until: str | None = None
+    pellet_boiler_power_manual_until: str | None = None
     automation_state: str = "BOOT"
     automation_reason: str = ""
     simulation_mode: bool = True

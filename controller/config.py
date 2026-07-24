@@ -62,6 +62,12 @@ class SchedulerConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class ManualControlConfig:
+    enabled: bool
+    command_file: Path
+
+
+@dataclass(frozen=True, slots=True)
 class HistoryConfig:
     enabled: bool
     database_file: Path
@@ -88,6 +94,7 @@ class ControllerConfig:
     relays: RelayConfig
     automation: AutomationConfig
     scheduler: SchedulerConfig
+    manual_control: ManualControlConfig
     history: HistoryConfig
     email_notifications: EmailNotificationConfig
 
@@ -113,6 +120,7 @@ def load_config(path: str | Path = "config/settings.toml") -> ControllerConfig:
     relays = _section(raw, "relays")
     automation = _section(raw, "automation")
     scheduler = _section(raw, "scheduler")
+    manual_control = _section(raw, "manual_control")
     history = _section(raw, "history")
     email_notifications = _section(raw, "email_notifications")
 
@@ -174,6 +182,12 @@ def load_config(path: str | Path = "config/settings.toml") -> ControllerConfig:
         scheduler=SchedulerConfig(
             enabled=bool(scheduler.get("enabled", True)),
             schedule_file=Path(str(scheduler.get("schedule_file", "runtime/schedule.json"))),
+        ),
+        manual_control=ManualControlConfig(
+            enabled=bool(manual_control.get("enabled", True)),
+            command_file=Path(
+                str(manual_control.get("command_file", "runtime/manual_control.json"))
+            ),
         ),
         history=HistoryConfig(
             enabled=bool(history.get("enabled", True)),

@@ -260,3 +260,37 @@ Przy aktualizacji z wcześniejszej paczki zachowaj bazę historii i plik stanu:
 ```
 
 Przykładowy harmonogram znajduje się w `config/schedule.example.json`.
+
+
+## Sterowanie ręczne — wersja 0.4.1
+
+Panel WWW umożliwia czasowe ręczne uruchomienie cyrkulacji CWU i grzałki
+elektrycznej. Polecenia są zapisywane atomowo w `runtime/manual_control.json`,
+a główny sterownik odczytuje je w każdym cyklu. Panel WWW pozostaje osobną
+usługą i nie przełącza GPIO bezpośrednio.
+
+Dostępne czasy z panelu:
+
+- cyrkulacja CWU: 5, 10, 20 lub 30 minut,
+- grzałka elektryczna: 15, 30 lub 60 minut.
+
+Każde polecenie ma czas wygaśnięcia zapisany w UTC. Po jego upływie sterownik
+automatycznie wraca do harmonogramu. Można też wyłączyć pojedyncze polecenie
+lub wszystkie polecenia ręczne. Pompa ładująca bojler i zasilanie pieca nie są
+udostępnione jako zwykłe przyciski ręczne.
+
+Konfiguracja:
+
+```toml
+[manual_control]
+enabled = true
+command_file = "runtime/manual_control.json"
+```
+
+Ręczne żądanie nadal przechodzi przez `AutomationController`, dlatego blokada
+jednoczesnej pracy pompy ładującej i grzałki pozostaje aktywna.
+
+
+## Sterowanie ręczne 0.4.1
+
+Panel WWW umożliwia czasowe sterowanie cyrkulacją CWU, grzałką elektryczną, pompą bojlera oraz wymuszenie włączenia lub wyłączenia zasilania pieca pelletowego. Pompa bojlera ma pierwszeństwo przed grzałką, a każde wymuszenie automatycznie wygasa.

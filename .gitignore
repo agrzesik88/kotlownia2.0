@@ -14,8 +14,6 @@ runtime/
 logs/
 *.log
 *.pid
-*.sqlite
-*.db
 
 # Dane pomiarowe i pliki stanu
 state.json

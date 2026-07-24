@@ -9,6 +9,7 @@ from controller.automation import AutomationController, AutomationInput
 from controller.config import ControllerConfig
 from controller.events import ControllerEvent, EventBus, EventType
 from controller.history import HistoryRepository
+from controller.manual import ManualControlDecision, ManualControlRepository
 from controller.notifications import EmailConfig, NotificationService
 from controller.pellet import PelletSensor
 from controller.relays import RelayController
@@ -78,6 +79,11 @@ class ControllerApplication:
             ),
             pellet_low_level_percent=config.automation.pellet_low_level_percent,
         )
+        self.manual_control = (
+            ManualControlRepository(config.manual_control.command_file)
+            if config.manual_control.enabled
+            else None
+        )
         self.scheduler = (
             TimeScheduler(ScheduleRepository(config.scheduler.schedule_file))
             if config.scheduler.enabled
@@ -86,6 +92,7 @@ class ControllerApplication:
         self.state = ControllerState(
             simulation_mode=config.application.simulation,
             scheduler_enabled=config.scheduler.enabled,
+            manual_control_enabled=config.manual_control.enabled,
         )
 
     def request_stop(self, *_args: object) -> None:
@@ -111,13 +118,20 @@ class ControllerApplication:
                 if self.scheduler is not None
                 else ScheduleDecision(False, False)
             )
+            manual = (
+                self.manual_control.evaluate()
+                if self.manual_control is not None
+                else ManualControlDecision()
+            )
             electric_heater_requested = (
                 self.electric_heater_requested
                 or schedule.electric_heater_requested
+                or manual.electric_heater_requested
             )
             cwu_circulation_requested = (
                 self.cwu_circulation_requested
                 or schedule.cwu_circulation_requested
+                or manual.cwu_circulation_requested
             )
 
             decision = self.automation.evaluate(
@@ -128,6 +142,8 @@ class ControllerApplication:
                     monotonic_seconds=now,
                     electric_heater_requested=electric_heater_requested,
                     cwu_circulation_requested=cwu_circulation_requested,
+                    boiler_loading_requested=manual.boiler_loading_requested,
+                    pellet_boiler_power_override=manual.pellet_boiler_power_override,
                 )
             )
             self.relays.apply(
@@ -146,6 +162,16 @@ class ControllerApplication:
             self.state.scheduler_enabled = self.scheduler is not None
             self.state.cwu_schedule_active = schedule.cwu_circulation_requested
             self.state.electric_heater_schedule_active = schedule.electric_heater_requested
+            self.state.manual_control_enabled = self.manual_control is not None
+            self.state.cwu_manual_active = manual.cwu_circulation_requested
+            self.state.electric_heater_manual_active = manual.electric_heater_requested
+            self.state.boiler_loading_manual_active = manual.boiler_loading_requested
+            self.state.pellet_boiler_power_manual_active = (manual.pellet_boiler_power_override is not None)
+            self.state.pellet_boiler_power_manual_override = manual.pellet_boiler_power_override
+            self.state.cwu_manual_until = manual.cwu_circulation_until
+            self.state.electric_heater_manual_until = manual.electric_heater_until
+            self.state.boiler_loading_manual_until = manual.boiler_loading_until
+            self.state.pellet_boiler_power_manual_until = manual.pellet_boiler_power_until
             self.state.last_error = None
             self._publish_recovery_if_needed()
             self._update_pellet_events(now, pellet_level, decision.pellet_low)
