@@ -1,0 +1,5 @@
+# Zależności uruchomieniowe Raspberry Pi
+gpiozero>=2.0,<3
+lgpio>=0.2.2,<1
+fastapi>=0.115,<1
+uvicorn>=0.34,<1

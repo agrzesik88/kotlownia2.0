@@ -1,0 +1,21 @@
+[Unit]
+Description=Kotłownia 2.0 - lokalny sterownik
+After=local-fs.target network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=__USER__
+Group=__GROUP__
+WorkingDirectory=__PROJECT_DIR__
+EnvironmentFile=-__PROJECT_DIR__/config/kotlownia.env
+ExecStart=__PROJECT_DIR__/.venv/bin/python -m controller.main --config __PROJECT_DIR__/config/settings.toml
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=20
+KillSignal=SIGTERM
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

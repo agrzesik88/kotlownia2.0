@@ -1,6 +1,6 @@
 [project]
 name = "kotlownia2"
-version = "0.1.0"
+version = "0.3.0"
 description = "Sterownik kotłowni dla Raspberry Pi"
 requires-python = ">=3.11"
 

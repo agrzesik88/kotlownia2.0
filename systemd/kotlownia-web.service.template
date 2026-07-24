@@ -1,0 +1,18 @@
+[Unit]
+Description=Kotłownia 2.0 - lokalny panel WWW
+After=network.target kotlownia.service
+Wants=network.target
+
+[Service]
+Type=simple
+User=__USER__
+Group=__GROUP__
+WorkingDirectory=__PROJECT_DIR__
+ExecStart=__PROJECT_DIR__/.venv/bin/python -m api.main --config __PROJECT_DIR__/config/settings.toml --host 0.0.0.0 --port 8088
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

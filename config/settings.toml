@@ -2,14 +2,31 @@
 name = "Kotlownia 2.0"
 simulation = true
 state_file = "runtime/state.json"
+loop_interval_seconds = 1.0
 
 [temperature]
+simulation = false
 heating_available_c = 45.0
 read_interval_seconds = 10
+simulation_value_c = 20.0
+# Przy kilku czujnikach DS18B20 odkomentuj i wpisz właściwy identyfikator:
+sensor_file = "/sys/bus/w1/devices/28-3ce1d4438132/w1_slave"
 
 [pellet]
+simulation = false
 trigger_gpio = 23
 echo_gpio = 24
+
+# Wartości kalibracyjne zbiornika — ustawimy je przed testem sprzętowym.
+empty_distance_cm = 100.0
+full_distance_cm = 10.0
+
+sample_count = 5
+minimum_valid_samples = 3
+max_consecutive_failures = 5
+sample_interval_seconds = 0.05
+
+simulation_level_percent = 75.0
 
 [relays]
 active_low = true
@@ -19,4 +36,27 @@ electric_heater_gpio = 19
 pellet_boiler_power_gpio = 26
 
 [automation]
+boiler_loading_temperature_c = 45.0
 boiler_loading_seconds = 600
+boiler_loading_recheck_seconds = 3600
+pellet_low_level_percent = 15.0
+pellet_low_reminder_seconds = 86400
+
+[scheduler]
+enabled = true
+schedule_file = "runtime/schedule.json"
+
+[history]
+enabled = true
+database_file = "runtime/history.db"
+sample_interval_seconds = 10.0
+
+[email_notifications]
+enabled = false
+smtp_host = "smtp.example.com"
+smtp_port = 587
+use_starttls = true
+username_env = "KOTLOWNIA_SMTP_USERNAME"
+password_env = "KOTLOWNIA_SMTP_PASSWORD"
+sender = "kotlownia@example.com"
+recipient = "adres@example.com"

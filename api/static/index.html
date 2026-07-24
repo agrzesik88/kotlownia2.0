@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Kotłownia 2.0</title>
+  <style>
+    :root { font-family: system-ui, sans-serif; color-scheme: dark; }
+    body { margin: 0; background: #111827; color: #e5e7eb; }
+    header { padding: 20px max(20px, 5vw); background: #0b1220; border-bottom: 1px solid #334155; }
+    main { max-width: 1180px; margin: auto; padding: 24px; }
+    h1,h2 { margin: 0 0 16px; }
+    .muted { color: #94a3b8; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(190px,1fr)); gap: 14px; }
+    .card, section { background: #1f2937; border: 1px solid #374151; border-radius: 14px; padding: 18px; }
+    .value { font-size: 2rem; font-weight: 700; margin-top: 8px; }
+    section { margin-top: 18px; }
+    .outputs { display: flex; flex-wrap: wrap; gap: 10px; }
+    .pill { padding: 7px 11px; border-radius: 999px; background: #374151; }
+    .on { background: #166534; }
+    .error { background: #7f1d1d; }
+    svg { width: 100%; height: 230px; background: #111827; border-radius: 10px; }
+    table { width: 100%; border-collapse: collapse; }
+    th,td { text-align: left; padding: 8px; border-bottom: 1px solid #374151; }
+    input,select,button { background: #111827; color: #e5e7eb; border: 1px solid #475569; border-radius: 8px; padding: 9px; }
+    button { cursor: pointer; background: #1d4ed8; border: 0; font-weight: 600; }
+    .schedule-row { display:grid; grid-template-columns: 1fr 1fr 2fr auto; gap:8px; margin:8px 0; align-items:center; }
+    .schedule-head { display:flex; align-items:center; justify-content:space-between; gap:15px; }
+    @media(max-width:700px){.schedule-row{grid-template-columns:1fr 1fr}.schedule-row input:last-of-type{grid-column:1/3}}
+  </style>
+</head>
+<body>
+<header><h1>Kotłownia 2.0</h1><div class="muted" id="updated">Łączenie…</div></header>
+<main>
+  <div class="grid">
+    <div class="card"><div class="muted">Temperatura rury</div><div class="value" id="temp">—</div></div>
+    <div class="card"><div class="muted">Poziom pelletu</div><div class="value" id="pellet">—</div></div>
+    <div class="card"><div class="muted">Stan automatyki</div><div class="value" id="state">—</div></div>
+    <div class="card"><div class="muted">Tryb</div><div class="value" id="mode">—</div></div>
+  </div>
+  <section><h2>Wyjścia</h2><div class="outputs" id="outputs"></div><p class="muted" id="reason"></p></section>
+  <section><h2>Historia</h2><svg id="chart" viewBox="0 0 1000 230" preserveAspectRatio="none"></svg></section>
+  <section>
+    <div class="schedule-head"><h2>Harmonogram</h2><button id="save">Zapisz</button></div>
+    <label>Strefa czasowa <input id="timezone" value="Europe/Warsaw"></label>
+    <div id="schedules"></div>
+    <p class="muted">Dni: mon,tue,wed,thu,fri,sat,sun. Okno może przechodzić przez północ.</p>
+    <div id="saveStatus" class="muted"></div>
+  </section>
+  <section><h2>Ostatnie zdarzenia</h2><table><thead><tr><th>Czas</th><th>Typ</th><th>Opis</th></tr></thead><tbody id="events"></tbody></table></section>
+</main>
+<script>
+const outputs=[['cwu_circulation_on','Cyrkulacja CWU'],['boiler_loading_on','Pompa bojlera'],['electric_heater_on','Grzałka'],['pellet_boiler_power_on','Zasilanie pieca']];
+const scheduleDefs=[['cwu_circulation','Cyrkulacja CWU'],['electric_heater','Grzałka elektryczna']];
+let schedule={};
+function fmt(v,s=''){return v==null?'—':Number(v).toFixed(1)+s}
+async function json(url,opts){const r=await fetch(url,opts);if(!r.ok)throw new Error(await r.text());return r.json()}
+async function refresh(){try{const [s,h,e]=await Promise.all([json('/api/status'),json('/api/history?limit=120'),json('/api/events?limit=20')]);
+ temp.textContent=fmt(s.pipe_temperature_c,'°C');pellet.textContent=fmt(s.pellet_level_percent,'%');state.textContent=s.automation_state;mode.textContent=s.simulation_mode?'SYMULACJA':'REALNY';updated.textContent='Aktualizacja: '+new Date(s.updated_at).toLocaleString();reason.textContent=s.automation_reason+(s.last_error?' — '+s.last_error:'');
+ outputsEl=document.getElementById('outputs');outputsEl.innerHTML=outputs.map(([k,n])=>`<span class="pill ${s[k]?'on':''}">${n}: ${s[k]?'ON':'OFF'}</span>`).join('');draw(h);events.innerHTML=e.map(x=>`<tr><td>${new Date(x.occurred_at).toLocaleString()}</td><td>${x.event_type}</td><td>${x.message}</td></tr>`).join('');}catch(err){updated.textContent='Błąd połączenia: '+err.message}}
+function draw(rows){const svg=document.getElementById('chart');if(rows.length<2){svg.innerHTML='';return} const vals=rows.flatMap(x=>[x.pipe_temperature_c,x.pellet_level_percent]).filter(x=>x!=null);const min=Math.min(...vals),max=Math.max(...vals);const pts=(key)=>rows.map((r,i)=>`${i*1000/(rows.length-1)},${215-(r[key]-min)*190/Math.max(1,max-min)}`).join(' ');svg.innerHTML=`<polyline fill="none" stroke="#f97316" stroke-width="4" points="${pts('pipe_temperature_c')}"/><polyline fill="none" stroke="#22c55e" stroke-width="4" points="${pts('pellet_level_percent')}"/><text x="15" y="22" fill="#f97316">temperatura</text><text x="130" y="22" fill="#22c55e">pellet</text>`}
+function renderSchedule(){timezone.value=schedule.timezone;schedules.innerHTML=scheduleDefs.map(([key,title])=>{const o=schedule[key]||{enabled:false,windows:[]};return `<div class="card" data-key="${key}" style="margin-top:12px"><label><input type="checkbox" class="enabled" ${o.enabled?'checked':''}> <strong>${title}</strong></label><div class="rows">${(o.windows||[]).map(rowHtml).join('')}</div><button class="add" type="button">Dodaj okno</button></div>`}).join('');document.querySelectorAll('.add').forEach(b=>b.onclick=()=>{b.parentElement.querySelector('.rows').insertAdjacentHTML('beforeend',rowHtml({start:'06:00',end:'06:10',weekdays:['mon','tue','wed','thu','fri']}))});document.querySelectorAll('.remove').forEach(bindRemove)}
+function rowHtml(w){return `<div class="schedule-row"><input class="start" type="time" value="${w.start}"><input class="end" type="time" value="${w.end}"><input class="days" value="${w.weekdays.join(',')}"><button class="remove" type="button">Usuń</button></div>`}
+function bindRemove(b){b.onclick=()=>b.parentElement.remove()}
+document.addEventListener('click',e=>{if(e.target.classList.contains('remove'))e.target.parentElement.remove()});
+save.onclick=async()=>{try{const payload={timezone:timezone.value};document.querySelectorAll('[data-key]').forEach(c=>{payload[c.dataset.key]={enabled:c.querySelector('.enabled').checked,windows:[...c.querySelectorAll('.schedule-row')].map(r=>({start:r.querySelector('.start').value,end:r.querySelector('.end').value,weekdays:r.querySelector('.days').value.split(',').map(x=>x.trim()).filter(Boolean)}))}});schedule=await json('/api/schedule',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});saveStatus.textContent='Zapisano. Sterownik odczyta zmianę automatycznie.';renderSchedule()}catch(err){saveStatus.textContent='Błąd: '+err.message}};
+(async()=>{schedule=await json('/api/schedule');renderSchedule();refresh();setInterval(refresh,5000)})();
+</script>
+</body></html>

@@ -1,0 +1,14 @@
+{
+  "timezone": "Europe/Warsaw",
+  "cwu_circulation": {
+    "enabled": true,
+    "windows": [
+      {"start": "06:00", "end": "06:10", "weekdays": ["mon", "tue", "wed", "thu", "fri"]},
+      {"start": "18:00", "end": "18:10", "weekdays": ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]}
+    ]
+  },
+  "electric_heater": {
+    "enabled": false,
+    "windows": []
+  }
+}

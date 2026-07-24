@@ -14,6 +14,8 @@ runtime/
 logs/
 *.log
 *.pid
+*.sqlite
+*.db
 
 # Dane pomiarowe i pliki stanu
 state.json
@@ -35,3 +37,4 @@ Thumbs.db
 android/.gradle/
 android/local.properties
 android/**/build/
+config/kotlownia.env
