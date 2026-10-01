@@ -16,7 +16,7 @@ class EmailConfig:
     username_env: str
     password_env: str
     sender: str
-    recipient: str
+    recipients: tuple[str, ...]
 
 
 class NotificationService:
@@ -54,11 +54,14 @@ class NotificationService:
                 config.password_env,
             )
             return False
+        if not config.sender or not config.recipients:
+            self.logger.error("Brak nadawcy lub odbiorców wiadomości e-mail")
+            return False
 
         message = EmailMessage()
         message["Subject"] = subject
         message["From"] = config.sender
-        message["To"] = config.recipient
+        message["To"] = ", ".join(config.recipients)
         message.set_content(body)
 
         try:
