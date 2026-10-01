@@ -105,10 +105,8 @@ class ManualControlRepository:
             values["cwu_circulation_until"] = expires_at
         elif output == "other":
             values["other_until"] = expires_at
-            values["boiler_loading_until"] = None
         elif output == "boiler_loading":
             values["boiler_loading_until"] = expires_at
-            values["other_until"] = None
         else:
             values["pellet_boiler_power_override"] = output.endswith("_on")
             values["pellet_boiler_power_until"] = expires_at

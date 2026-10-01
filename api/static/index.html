@@ -47,6 +47,8 @@
     .manual-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:14px; }
     .button-row { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
     .manual-status { margin-top:10px; font-weight:600; }
+    .manual-pending { margin-top:10px; padding:10px 12px; border-radius:8px; background:#1e3a8a; color:#dbeafe; font-weight:600; }
+    button:disabled { opacity:.65; cursor:wait; }
     .schedule-row { display:grid; grid-template-columns: 1fr 1fr 2fr auto; gap:8px; margin:8px 0; align-items:center; }
     .schedule-head { display:flex; align-items:center; justify-content:space-between; gap:15px; }
     @media(max-width:700px){.schedule-row{grid-template-columns:1fr 1fr}.schedule-row input:last-of-type{grid-column:1/3}}
@@ -163,11 +165,31 @@ function renderManualState(s){
  boilerManualStatus.className='manual-status '+(s.boiler_loading_manual_active?'on':'');
  powerManualStatus.className='manual-status '+(s.pellet_boiler_power_manual_active?(s.pellet_boiler_power_manual_override?'on':'error'):'');
 }
-async function activateManual(output,minutes){try{await json('/api/manual/activate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({output,duration_minutes:Number(minutes)})});manualMessage.textContent='Polecenie zapisane. Sterownik zastosuje je w najbliższym cyklu.';await refresh()}catch(err){manualMessage.textContent='Błąd: '+err.message}}
-async function stopManual(output){try{await json('/api/manual/deactivate/'+output,{method:'POST'});manualMessage.textContent='Tryb ręczny wyłączony.';await refresh()}catch(err){manualMessage.textContent='Błąd: '+err.message}}
-document.querySelectorAll('[data-manual]').forEach(b=>b.onclick=()=>activateManual(b.dataset.manual,b.dataset.minutes));
-document.querySelectorAll('[data-stop]').forEach(b=>b.onclick=()=>stopManual(b.dataset.stop));
-clearManual.onclick=async()=>{try{await json('/api/manual/clear',{method:'POST'});manualMessage.textContent='Wszystkie polecenia ręczne wyłączone.';await refresh()}catch(err){manualMessage.textContent='Błąd: '+err.message}};
+async function activateManual(button,output,minutes){
+ const statusMap={cwu_circulation:'cwuManualStatus',boiler_loading:'boilerManualStatus',other:'otherManualStatus',pellet_boiler_power_on:'powerManualStatus',pellet_boiler_power_off:'powerManualStatus'};
+ const status=document.getElementById(statusMap[output]);
+ button.disabled=true;status.textContent='Wysyłanie…';status.className='manual-status manual-pending';
+ try{await json('/api/manual/activate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({output,duration_minutes:Number(minutes)})});manualMessage.textContent='Polecenie przyjęte. Sterownik zastosuje je w najbliższym cyklu.';manualMessage.className='muted'}
+ catch(err){status.textContent='Błąd wysyłania';status.className='manual-status save-error';manualMessage.textContent='Błąd: '+err.message;manualMessage.className='save-error'}
+ finally{button.disabled=false}
+}
+async function stopManual(button,output){
+ const statusMap={cwu_circulation:'cwuManualStatus',boiler_loading:'boilerManualStatus',other:'otherManualStatus',pellet_boiler_power:'powerManualStatus'};
+ const status=document.getElementById(statusMap[output]);
+ button.disabled=true;status.textContent='Wyłączanie…';status.className='manual-status manual-pending';
+ try{await json('/api/manual/deactivate/'+output,{method:'POST'});manualMessage.textContent='Polecenie wyłączenia przyjęte.';manualMessage.className='muted'}
+ catch(err){status.textContent='Błąd wyłączania';status.className='manual-status save-error';manualMessage.textContent='Błąd: '+err.message;manualMessage.className='save-error'}
+ finally{button.disabled=false}
+}
+document.querySelectorAll('[data-manual]').forEach(b=>b.onclick=()=>activateManual(b,b.dataset.manual,b.dataset.minutes));
+document.querySelectorAll('[data-stop]').forEach(b=>b.onclick=()=>stopManual(b,b.dataset.stop));
+clearManual.onclick=async()=>{
+ const button=clearManual;const originalText=button.textContent;
+ button.disabled=true;button.textContent='Wyłączanie…';manualMessage.textContent='Wyłączanie wszystkich poleceń ręcznych…';manualMessage.className='manual-pending';
+ try{await json('/api/manual/clear',{method:'POST'});manualMessage.textContent='Wszystkie polecenia ręczne wyłączone.';await refresh()}
+ catch(err){manualMessage.textContent='Błąd: '+err.message;manualMessage.className='save-error'}
+ finally{button.disabled=false;button.textContent=originalText}
+};
 async function loadAutomationSettings(){
   try{
     const s=await json('/api/automation-settings');

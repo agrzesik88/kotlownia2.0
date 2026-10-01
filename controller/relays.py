@@ -117,11 +117,6 @@ class RelayController:
         other_on: bool,
         pellet_boiler_power_on: bool,
     ) -> bool:
-        if boiler_loading_on and other_on:
-            raise ValueError(
-                "Pompa ładująca i inne nie mogą pracować równocześnie"
-            )
-
         changed = False
         changed |= self.set_cwu_circulation(cwu_circulation_on)
         changed |= self.set_boiler_loading(boiler_loading_on)

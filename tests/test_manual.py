@@ -45,14 +45,14 @@ def test_manual_control_rejects_unsafe_duration(tmp_path: Path) -> None:
         repository.activate("other", 121)
 
 
-def test_manual_boiler_loading_disables_other_request(tmp_path: Path) -> None:
+def test_manual_boiler_loading_does_not_disable_other_request(tmp_path: Path) -> None:
     clock = Clock()
     repository = ManualControlRepository(tmp_path / "manual.json", now=clock.now)
     repository.activate("other", 30)
     repository.activate("boiler_loading", 10)
     decision = repository.evaluate()
     assert decision.boiler_loading_requested is True
-    assert decision.other_requested is False
+    assert decision.other_requested is True
 
 
 def test_manual_power_override_can_force_off_and_expire(tmp_path: Path) -> None:

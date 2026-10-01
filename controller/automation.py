@@ -108,6 +108,7 @@ class AutomationController:
                 pellet_low=pellet_low,
                 cwu_circulation_on=inputs.cwu_circulation_requested,
                 boiler_loading_on=True,
+                other_on=inputs.other_requested,
                 reason="Pompa bojlera pracuje w trybie ręcznym",
             )
 
@@ -130,6 +131,7 @@ class AutomationController:
                 pellet_low=pellet_low,
                 cwu_circulation_on=inputs.cwu_circulation_requested,
                 boiler_loading_on=True,
+                other_on=inputs.other_requested,
                 reason="Rozpoczęto czasowe ładowanie bojlera",
             )
 
@@ -187,6 +189,7 @@ class AutomationController:
                 pellet_low=pellet_low,
                 cwu_circulation_on=inputs.cwu_circulation_requested,
                 boiler_loading_on=True,
+                other_on=inputs.other_requested,
                 reason="Trwa czasowe ładowanie bojlera",
             )
 
@@ -230,8 +233,6 @@ class AutomationController:
         other_on: bool = False,
         reason: str,
     ) -> AutomationDecision:
-        if boiler_loading_on and other_on:
-            raise RuntimeError("Pompa ładująca i inne nie mogą pracować równocześnie")
         return AutomationDecision(
             state=self._state,
             cwu_circulation_on=cwu_circulation_on,
