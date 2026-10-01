@@ -83,6 +83,16 @@
         <div class="manual-status" id="boilerManualStatus">Nieaktywne</div>
       </div>
       <div class="card">
+        <strong>Inne</strong>
+        <div class="button-row">
+          <button data-manual="other" data-minutes="15">15 min</button>
+          <button data-manual="other" data-minutes="30">30 min</button>
+          <button data-manual="other" data-minutes="60">60 min</button>
+          <button class="secondary" data-stop="other">Wyłącz</button>
+        </div>
+        <div class="manual-status" id="otherManualStatus">Nieaktywne</div>
+      </div>
+      <div class="card">
         <strong>Zasilanie pieca pelletowego</strong>
         <p class="muted">Czasowe wymuszenie stanu. Po upływie czasu wraca automatyka.</p>
         <div class="button-row">
@@ -93,16 +103,6 @@
           <button class="secondary" data-stop="pellet_boiler_power">Automatyka</button>
         </div>
         <div class="manual-status" id="powerManualStatus">Automatyka</div>
-      </div>
-      <div class="card">
-        <strong>Inne</strong>
-        <div class="button-row">
-          <button data-manual="other" data-minutes="15">15 min</button>
-          <button data-manual="other" data-minutes="30">30 min</button>
-          <button data-manual="other" data-minutes="60">60 min</button>
-          <button class="secondary" data-stop="other">Wyłącz</button>
-        </div>
-        <div class="manual-status" id="otherManualStatus">Nieaktywne</div>
       </div>
     </div>
     <div id="manualMessage" class="muted"></div>
