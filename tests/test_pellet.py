@@ -105,22 +105,46 @@ def test_successful_read_resets_failure_counter() -> None:
     assert sensor.using_last_good_value is False
 
 
-def test_small_level_changes_within_tolerance_are_ignored() -> None:
+def test_small_level_changes_are_smoothed_by_filter() -> None:
     backend = SequenceDistanceSensor(
-        [0.57] * 5
-        + [0.568] * 5
-        + [0.565] * 5
+        [0.570] * 7
+        + [0.568] * 7
+        + [0.566] * 7
+        + [0.564] * 7
+        + [0.562] * 7
     )
     sensor = PelletSensor(
-        hardware_config(level_tolerance_percent=0.5),
+        hardware_config(
+            sample_count=7,
+            minimum_valid_samples=5,
+            level_tolerance_percent=0.5,
+        ),
         simulation=False,
         sensor=backend,
     )
 
-    first_level = sensor.read_level_percent()
-    second_level = sensor.read_level_percent()
-    third_level = sensor.read_level_percent()
+    levels = [sensor.read_level_percent() for _ in range(5)]
 
-    assert first_level == 0.0
-    assert second_level == 0.0
-    assert third_level > 0.5
+    assert levels[0] == 0.0
+    assert levels[1] == 0.0
+    assert levels[2] == 0.0
+    assert levels[3] == 0.0
+    assert levels[4] == pytest.approx((57.0 - 56.4) / 48.1 * 100.0)
+
+
+def test_extreme_samples_are_ignored() -> None:
+    backend = SequenceDistanceSensor(
+        [0.56, 0.561, 0.562, 0.563, 0.564, 0.565, 0.80]
+    )
+    sensor = PelletSensor(
+        hardware_config(sample_count=7, minimum_valid_samples=5),
+        simulation=False,
+        sensor=backend,
+    )
+
+    level = sensor.read_level_percent()
+
+    expected_distance = 0.563 * 100.0
+    assert level == pytest.approx(
+        (57.0 - expected_distance) / 48.1 * 100.0
+    )
