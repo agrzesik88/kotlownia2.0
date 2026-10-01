@@ -46,7 +46,7 @@ def test_loading_starts_at_45_degrees() -> None:
     )
     assert decision.state is BoilerState.BOILER_LOADING
     assert decision.boiler_loading_on
-    assert not decision.other_on
+    assert decision.other_on
 
 
 def test_loading_runs_for_configured_ten_minutes() -> None:
@@ -117,7 +117,7 @@ def test_recheck_does_not_load_when_temperature_is_below_threshold() -> None:
     assert decision.state is BoilerState.IDLE
 
 
-def test_other_never_runs_together_with_loading_pump() -> None:
+def test_other_can_run_together_with_loading_pump() -> None:
     controller = AutomationController()
     decision = controller.evaluate(
         make_input(
@@ -185,7 +185,7 @@ def test_cwu_schedule_request_is_forwarded_to_decision() -> None:
     assert decision.cwu_circulation_on is True
 
 
-def test_manual_boiler_loading_has_priority_over_other() -> None:
+def test_manual_boiler_loading_does_not_disable_other() -> None:
     controller = AutomationController()
     decision = controller.evaluate(
         AutomationInput(
@@ -198,7 +198,7 @@ def test_manual_boiler_loading_has_priority_over_other() -> None:
         )
     )
     assert decision.boiler_loading_on is True
-    assert decision.other_on is False
+    assert decision.other_on is True
 
 
 def test_pellet_boiler_power_can_be_overridden_off() -> None:
