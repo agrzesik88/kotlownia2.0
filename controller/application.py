@@ -38,6 +38,7 @@ class ControllerApplication:
         self._pellet_was_low = False
         self._had_error = False
         self._last_history_recorded_at: float | None = None
+        self._last_cwu_circulation_on: bool | None = None
         self._automation_settings_path = (
             config.application.state_file.parent / "automation_settings.json"
         )
@@ -148,6 +149,10 @@ class ControllerApplication:
                 other_on=decision.other_on,
                 pellet_boiler_power_on=decision.pellet_boiler_power_on,
             )
+            self._record_cwu_schedule_start(
+                decision.cwu_circulation_on,
+                schedule.cwu_circulation_requested,
+            )
 
             self.state.pipe_temperature_c = temperature
             self.state.pellet_level_percent = pellet_level
@@ -180,6 +185,7 @@ class ControllerApplication:
                 other_on=decision.other_on,
                 pellet_boiler_power_on=decision.pellet_boiler_power_on,
             )
+            self._last_cwu_circulation_on = False
             self.state.automation_state = decision.state.name
             self.state.automation_reason = decision.reason
             self.state.output_status = {
@@ -202,6 +208,18 @@ class ControllerApplication:
             self.state.save(self.config.application.state_file)
             self._record_history_if_due(now)
         return self.state
+
+    def _record_cwu_schedule_start(self, cwu_circulation_on: bool, schedule_active: bool) -> None:
+        previous = self._last_cwu_circulation_on
+        if cwu_circulation_on and schedule_active and previous is not True:
+            self.event_bus.publish(
+                ControllerEvent(
+                    EventType.CWU_CIRCULATION_SCHEDULE_STARTED,
+                    "Cyrkulacja CWU została włączona przez harmonogram",
+                    {"output": "cwu_circulation", "source": "HARMONOGRAM"},
+                )
+            )
+        self._last_cwu_circulation_on = cwu_circulation_on
 
     def _update_output_status(self, decision: AutomationDecision, schedule: ScheduleDecision, manual: ManualControlDecision) -> None:
         cwu_sources = []

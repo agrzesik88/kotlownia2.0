@@ -55,6 +55,7 @@
     .day-button { padding:8px 10px; background:#374151; }
     .day-button.active { background:#1d4ed8; }
     .schedule-head { display:flex; align-items:center; justify-content:space-between; gap:15px; }
+    .schedule-last-run { margin-top:8px; font-size:.9rem; color:#94a3b8; }
     @media(max-width:900px){.schedule-row{grid-template-columns:1fr 1fr}.schedule-row .schedule-field:nth-child(n+3){grid-column:1/3}}
   </style>
 </head>
@@ -147,16 +148,17 @@
 const outputs=[['cwu_circulation_on','Cyrkulacja CWU'],['boiler_loading_on','Pompa bojlera'],['other_on','Inne'],['pellet_boiler_power_on','Zasilanie pieca']];
 const scheduleDefs=[['cwu_circulation','Cyrkulacja CWU'],['other','Inne']];
 let schedule={};
+let scheduleStatus={cwu_circulation_last_started_at:null};
 function fmt(v,s=''){return v==null?'—':Number(v).toFixed(1)+s}
 async function json(url,opts){const r=await fetch(url,opts);if(!r.ok)throw new Error(await r.text());return r.json()}
-async function refresh(){try{const [s,h,e,a,al]=await Promise.all([json('/api/status'),json('/api/history?limit=120'),json('/api/events?limit=20'),json('/api/automation-status'),json('/api/alerts')]);
+async function refresh(){try{const [s,h,e,a,al,ss]=await Promise.all([json('/api/status'),json('/api/history?limit=120'),json('/api/events?limit=20'),json('/api/automation-status'),json('/api/alerts'),json('/api/schedule-status')]);
  temp.textContent=fmt(s.pipe_temperature_c,'°C');pellet.textContent=fmt(s.pellet_level_percent,'%');state.textContent=s.automation_state;mode.textContent=s.simulation_mode?'SYMULACJA':'REALNY';updated.textContent='Aktualizacja: '+new Date(s.updated_at).toLocaleString();reason.textContent=s.automation_reason+(s.last_error?' — '+s.last_error:'');
  const alertBox=document.getElementById('alerts');
  const activeAlerts=al.alerts||[];
  document.getElementById('alertsSection').style.display=activeAlerts.length?'block':'none';
  alertBox.innerHTML=activeAlerts.map(x=>`<div class="alert alert-${x.severity.toLowerCase()}"><span class="alert-title">${x.severity==='ERROR'?'BŁĄD':'OSTRZEŻENIE'}</span>${x.message}</div>`).join('');
  const outputNames={cwu_circulation:'Cyrkulacja CWU',boiler_loading:'Pompa bojlera',other:'Inne',pellet_boiler_power:'Zasilanie pieca'};
- outputsEl=document.getElementById('outputs');outputsEl.innerHTML=Object.entries(a.outputs).map(([key,o])=>`<div class="output-card"><div class="output-head"><strong>${outputNames[key]||key}</strong><span class="output-state ${o.state==='ON'?'on':''}">${o.state}</span></div><div class="output-mode">Żądanie: ${o.requested||o.state} · Tryb: ${o.mode}</div><div class="output-reason">${o.reason}</div></div>`).join('');renderManualState(s);draw(h);events.innerHTML=e.map(x=>`<tr><td>${new Date(x.occurred_at).toLocaleString()}</td><td>${x.event_type}</td><td>${x.message}</td></tr>`).join('');}catch(err){updated.textContent='Błąd połączenia: '+err.message}}
+ outputsEl=document.getElementById('outputs');outputsEl.innerHTML=Object.entries(a.outputs).map(([key,o])=>`<div class="output-card"><div class="output-head"><strong>${outputNames[key]||key}</strong><span class="output-state ${o.state==='ON'?'on':''}">${o.state}</span></div><div class="output-mode">Żądanie: ${o.requested||o.state} · Tryb: ${o.mode}</div><div class="output-reason">${o.reason}</div></div>`).join('');renderManualState(s);draw(h);events.innerHTML=e.map(x=>`<tr><td>${new Date(x.occurred_at).toLocaleString()}</td><td>${x.event_type}</td><td>${x.message}</td></tr>`).join('');scheduleStatus=ss;updateScheduleStatus();}catch(err){updated.textContent='Błąd połączenia: '+err.message}}
 function untilText(value){return value?'Aktywne do '+new Date(value).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}):'Nieaktywne'}
 function renderManualState(s){
  cwuManualStatus.textContent=untilText(s.cwu_manual_until);
@@ -236,7 +238,8 @@ function draw(rows){
  svg.innerHTML=`${grid}<polyline fill="none" stroke="#f97316" stroke-width="4" points="${pts('pipe_temperature_c')}"/><polyline fill="none" stroke="#22c55e" stroke-width="4" points="${pts('pellet_level_percent')}"/>${lastLabels}<text x="${left+10}" y="16" fill="#f97316">temperatura [°C]</text><text x="${left+150}" y="16" fill="#22c55e">pellet [%]</text>${timeLabels}`;
 }
 const dayDefs=[['mon','Pon'],['tue','Wt'],['wed','Śr'],['thu','Czw'],['fri','Pt'],['sat','Sob'],['sun','Nd']];
-function renderSchedule(){schedules.innerHTML=scheduleDefs.map(([key,title])=>{const o=schedule[key]||{enabled:false,windows:[]};return `<div class="card" data-key="${key}" style="margin-top:12px"><label><input type="checkbox" class="enabled" ${o.enabled?'checked':''}> <strong>${title}</strong></label><div class="rows">${(o.windows||[]).map(rowHtml).join('')}</div><button class="add" type="button">Dodaj zakres</button></div>`}).join('');document.querySelectorAll('.add').forEach(b=>b.onclick=()=>{b.parentElement.querySelector('.rows').insertAdjacentHTML('beforeend',rowHtml({start:'06:00',end:'08:00',duration_minutes:10,repeat_minutes:60,weekdays:['mon','tue','wed','thu','fri']}));bindScheduleButtons()});bindScheduleButtons()}
+function renderSchedule(){schedules.innerHTML=scheduleDefs.map(([key,title])=>{const o=schedule[key]||{enabled:false,windows:[]};const lastRun=key==='cwu_circulation'?'<div class="schedule-last-run" data-schedule-last-run="cwu_circulation">Ostatnie włączenie przez harmonogram: —</div>':'';return `<div class="card" data-key="${key}" style="margin-top:12px"><label><input type="checkbox" class="enabled" ${o.enabled?'checked':''}> <strong>${title}</strong></label>${lastRun}<div class="rows">${(o.windows||[]).map(rowHtml).join('')}</div><button class="add" type="button">Dodaj zakres</button></div>`}).join('');document.querySelectorAll('.add').forEach(b=>b.onclick=()=>{b.parentElement.querySelector('.rows').insertAdjacentHTML('beforeend',rowHtml({start:'06:00',end:'08:00',duration_minutes:10,repeat_minutes:60,weekdays:['mon','tue','wed','thu','fri']}));bindScheduleButtons()});bindScheduleButtons();updateScheduleStatus()}
+function updateScheduleStatus(){const element=document.querySelector('[data-schedule-last-run="cwu_circulation"]');if(!element)return;const value=scheduleStatus.cwu_circulation_last_started_at;element.textContent='Ostatnie włączenie przez harmonogram: '+(value?new Date(value).toLocaleString():'—')}
 function rowHtml(w){const days=w.weekdays||['mon','tue','wed','thu','fri'];return `<div class="schedule-row"><label class="schedule-field">Start<input class="start" type="time" value="${w.start}"></label><label class="schedule-field">Koniec<input class="end" type="time" value="${w.end}"></label><label class="schedule-field">Czas trwania [min]<input class="duration" type="number" min="1" max="1440" value="${w.duration_minutes??10}"></label><label class="schedule-field">Ponowne uruchomienie po [min]<input class="repeat" type="number" min="1" max="10080" value="${w.repeat_minutes??60}"></label><div class="schedule-field">Dni<div class="schedule-days">${dayDefs.map(([key,label])=>`<button type="button" class="day-button ${days.includes(key)?'active':''}" data-day="${key}">${label}</button>`).join('')}</div></div><button class="remove secondary" type="button">Usuń</button></div>`}
 function bindScheduleButtons(){document.querySelectorAll('.day-button').forEach(b=>b.onclick=()=>b.classList.toggle('active'));document.querySelectorAll('.remove').forEach(bindRemove)}
 function bindRemove(b){b.onclick=()=>b.parentElement.remove()}

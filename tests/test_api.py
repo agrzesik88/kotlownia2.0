@@ -198,3 +198,25 @@ def test_automation_settings_reject_invalid_values(tmp_path: Path) -> None:
         },
     )
     assert response.status_code == 422
+
+
+def test_schedule_status_reads_last_cwu_start_event(tmp_path: Path) -> None:
+    from controller.events import ControllerEvent, EventType
+    from controller.history import HistoryRepository
+
+    config = write_config(tmp_path)
+    history = HistoryRepository(tmp_path / "history.db")
+    try:
+        history.record_event(
+            ControllerEvent(
+                EventType.CWU_CIRCULATION_SCHEDULE_STARTED,
+                "Cyrkulacja CWU została włączona przez harmonogram",
+            )
+        )
+    finally:
+        history.close()
+
+    client = TestClient(create_app(config))
+    response = client.get("/api/schedule-status")
+    assert response.status_code == 200
+    assert response.json()["cwu_circulation_last_started_at"] is not None

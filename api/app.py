@@ -119,6 +119,14 @@ def create_app(config_path: str | Path = "config/settings.toml") -> FastAPI:
         return schedule.to_dict()
 
 
+    @app.get("/api/schedule-status")
+    def schedule_status() -> dict[str, Any]:
+        return {
+            "cwu_circulation_last_started_at": _read_latest_event_time(
+                config, "CWU_CIRCULATION_SCHEDULE_STARTED"
+            )
+        }
+
     @app.get("/api/manual")
     def get_manual() -> dict[str, Any]:
         decision = app.state.manual_repository.evaluate()
@@ -243,3 +251,14 @@ def _read_events(config: ControllerConfig, limit: int) -> list[dict[str, Any]]:
         result.append(item)
     return result
 
+
+
+def _read_latest_event_time(config: ControllerConfig, event_type: str) -> str | None:
+    if not config.history.database_file.exists():
+        return None
+    with sqlite3.connect(config.history.database_file, timeout=2.0) as db:
+        row = db.execute(
+            "SELECT occurred_at FROM events WHERE event_type = ? ORDER BY id DESC LIMIT 1",
+            (event_type,),
+        ).fetchone()
+    return str(row[0]) if row is not None else None
