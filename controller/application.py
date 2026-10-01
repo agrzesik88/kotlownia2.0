@@ -5,7 +5,7 @@ from threading import Event
 from time import monotonic
 from typing import Callable
 
-from controller.automation import AutomationController, AutomationInput
+from controller.automation import AutomationController, AutomationDecision, AutomationInput
 from controller.config import ControllerConfig
 from controller.events import ControllerEvent, EventBus, EventType
 from controller.history import HistoryRepository
@@ -197,6 +197,7 @@ class ControllerApplication:
             self.state.electric_heater_manual_until = manual.electric_heater_until
             self.state.boiler_loading_manual_until = manual.boiler_loading_until
             self.state.pellet_boiler_power_manual_until = manual.pellet_boiler_power_until
+            self._update_output_status(decision, schedule, manual)
             self.state.last_error = None
             self._publish_recovery_if_needed()
             self._update_pellet_events(now, pellet_level, decision.pellet_low)
@@ -210,6 +211,12 @@ class ControllerApplication:
             )
             self.state.automation_state = decision.state.name
             self.state.automation_reason = decision.reason
+            self.state.output_status = {
+                "cwu_circulation": {"state": "OFF", "requested": "OFF", "mode": "AUTO", "reason": "Sterownik w trybie awaryjnym"},
+                "boiler_loading": {"state": "OFF", "requested": "OFF", "mode": "AUTO", "reason": "Sterownik w trybie awaryjnym"},
+                "electric_heater": {"state": "OFF", "requested": "OFF", "mode": "AUTO", "reason": "Sterownik w trybie awaryjnym"},
+                "pellet_boiler_power": {"state": "ON", "requested": "ON", "mode": "AUTO", "reason": "Tryb awaryjny pozostawia zasilanie pieca włączone"},
+            }
             self.state.last_error = str(exc)
             if not self._had_error:
                 self.event_bus.publish(
@@ -230,6 +237,94 @@ class ControllerApplication:
             self.state.save(self.config.application.state_file)
             self._record_history_if_due(now)
         return self.state
+
+    def _update_output_status(
+        self,
+        decision: AutomationDecision,
+        schedule: ScheduleDecision,
+        manual: ManualControlDecision,
+    ) -> None:
+        cwu_sources = []
+        if manual.cwu_circulation_requested:
+            cwu_sources.append("RĘCZNY")
+        if schedule.cwu_circulation_requested:
+            cwu_sources.append("HARMONOGRAM")
+        cwu_mode = " + ".join(cwu_sources) if cwu_sources else "AUTO"
+        cwu_reason = (
+            "Aktywne żądanie: " + " + ".join(cwu_sources)
+            if cwu_sources
+            else "Brak żądania cyrkulacji"
+        )
+
+        if manual.boiler_loading_requested:
+            boiler_mode = "RĘCZNY"
+            boiler_reason = "Pompa bojlera pracuje na żądanie ręczne"
+        elif decision.boiler_loading_on:
+            boiler_mode = "AUTO"
+            boiler_reason = decision.reason
+        else:
+            boiler_mode = "AUTO"
+            boiler_reason = "Automatyka nie wymaga teraz ładowania bojlera"
+
+        heater_sources = []
+        if manual.electric_heater_requested:
+            heater_sources.append("RĘCZNY")
+        if schedule.electric_heater_requested:
+            heater_sources.append("HARMONOGRAM")
+        heater_requested = (
+            self.electric_heater_requested
+            or manual.electric_heater_requested
+            or schedule.electric_heater_requested
+        )
+        if heater_sources:
+            heater_mode = " + ".join(heater_sources)
+            heater_reason = "Aktywne żądanie: " + " + ".join(heater_sources)
+            if decision.boiler_loading_on and not decision.electric_heater_on:
+                heater_reason = "Żądanie zablokowane — pracuje pompa bojlera"
+        elif self.electric_heater_requested:
+            heater_mode = "AUTO"
+            heater_reason = "Aktywne żądanie sterownika"
+        else:
+            heater_mode = "AUTO"
+            heater_reason = "Brak żądania grzania elektrycznego"
+
+        if manual.pellet_boiler_power_override is not None:
+            power_mode = "RĘCZNY"
+            power_reason = (
+                "Wymuszone włączenie ręczne"
+                if manual.pellet_boiler_power_override
+                else "Wymuszone wyłączenie ręczne"
+            )
+        else:
+            power_mode = "AUTO"
+            power_reason = "Zasilanie sterowane automatycznie"
+
+        self.state.output_status = {
+            "cwu_circulation": {
+                "state": "ON" if decision.cwu_circulation_on else "OFF",
+                "requested": "ON" if (self.cwu_circulation_requested or manual.cwu_circulation_requested or schedule.cwu_circulation_requested) else "OFF",
+                "mode": cwu_mode,
+                "reason": cwu_reason,
+            },
+            "boiler_loading": {
+                "state": "ON" if decision.boiler_loading_on else "OFF",
+                "requested": "ON" if (manual.boiler_loading_requested or decision.boiler_loading_on) else "OFF",
+                "mode": boiler_mode,
+                "reason": boiler_reason,
+            },
+            "electric_heater": {
+                "state": "ON" if decision.electric_heater_on else "OFF",
+                "requested": "ON" if heater_requested else "OFF",
+                "mode": heater_mode,
+                "reason": heater_reason,
+            },
+            "pellet_boiler_power": {
+                "state": "ON" if decision.pellet_boiler_power_on else "OFF",
+                "requested": "ON" if decision.pellet_boiler_power_on else "OFF",
+                "mode": power_mode,
+                "reason": power_reason,
+            },
+        }
 
     def _publish_recovery_if_needed(self) -> None:
         if not self._had_error:

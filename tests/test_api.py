@@ -41,6 +41,51 @@ def test_status_reads_atomic_state_file(tmp_path: Path) -> None:
     assert response.json()["automation_state"] == "IDLE"
 
 
+
+def test_automation_status_reads_output_reasons(tmp_path: Path) -> None:
+    config = write_config(tmp_path)
+    (tmp_path / "state.json").write_text(
+        json.dumps(
+            {
+                "automation_state": "BOILER_LOADING",
+                "automation_reason": "Trwa czasowe ładowanie bojlera",
+                "output_status": {
+                    "cwu_circulation": {
+                        "state": "OFF",
+                        "mode": "AUTO",
+                        "reason": "Brak żądania cyrkulacji",
+                    },
+                    "boiler_loading": {
+                        "state": "ON",
+                        "mode": "AUTO",
+                        "reason": "Trwa czasowe ładowanie bojlera",
+                    },
+                    "electric_heater": {
+                        "state": "OFF",
+                        "mode": "AUTO",
+                        "reason": "Żądanie zablokowane — pracuje pompa bojlera",
+                    },
+                    "pellet_boiler_power": {
+                        "state": "ON",
+                        "mode": "AUTO",
+                        "reason": "Zasilanie sterowane automatycznie",
+                    },
+                },
+                "updated_at": "2026-10-01T10:00:00+00:00",
+            }
+        ),
+        encoding="utf-8",
+    )
+    client = TestClient(create_app(config))
+    response = client.get("/api/automation-status")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["automation_state"] == "BOILER_LOADING"
+    assert data["outputs"]["boiler_loading"]["state"] == "ON"
+    assert data["outputs"]["boiler_loading"]["reason"] == "Trwa czasowe ładowanie bojlera"
+    assert data["outputs"]["electric_heater"]["reason"] == "Żądanie zablokowane — pracuje pompa bojlera"
+
+
 def test_schedule_can_be_saved_and_read(tmp_path: Path) -> None:
     client = TestClient(create_app(write_config(tmp_path)))
     payload = {

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 import json
 from pathlib import Path
@@ -36,6 +36,7 @@ class ControllerState:
     pellet_boiler_power_manual_until: str | None = None
     automation_state: str = "BOOT"
     automation_reason: str = ""
+    output_status: dict[str, dict[str, str]] = field(default_factory=dict)
     simulation_mode: bool = True
     last_error: str | None = None
     updated_at: str = ""
