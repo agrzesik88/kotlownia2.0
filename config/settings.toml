@@ -18,8 +18,8 @@ trigger_gpio = 23
 echo_gpio = 24
 
 # Wartości kalibracyjne zbiornika — ustawimy je przed testem sprzętowym.
-empty_distance_cm = 100.0
-full_distance_cm = 10.0
+empty_distance_cm = 57.0
+full_distance_cm = 8.9
 
 sample_count = 5
 minimum_valid_samples = 3
