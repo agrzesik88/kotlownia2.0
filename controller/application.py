@@ -40,6 +40,7 @@ class ControllerApplication:
         self._last_history_recorded_at: float | None = None
         self._last_cwu_circulation_on: bool | None = None
         self._cwu_schedule_started_at: float | None = None
+        self._last_cwu_schedule_active = False
         self._automation_settings_path = (
             config.application.state_file.parent / "automation_settings.json"
         )
@@ -202,6 +203,7 @@ class ControllerApplication:
                 )
             self._last_cwu_circulation_on = False
             self._cwu_schedule_started_at = None
+            self._last_cwu_schedule_active = False
             self.state.automation_state = decision.state.name
             self.state.automation_reason = decision.reason
             self.state.output_status = {
@@ -241,7 +243,7 @@ class ControllerApplication:
                     {"output": "cwu_circulation", "source": "HARMONOGRAM"},
                 )
             )
-        elif previous is True and not cwu_circulation_on and self._cwu_schedule_started_at is not None:
+        elif self._last_cwu_schedule_active and not schedule_active and self._cwu_schedule_started_at is not None:
             duration_seconds = max(0.0, now - self._cwu_schedule_started_at)
             self.event_bus.publish(
                 ControllerEvent(
@@ -256,6 +258,7 @@ class ControllerApplication:
             )
             self._cwu_schedule_started_at = None
         self._last_cwu_circulation_on = cwu_circulation_on
+        self._last_cwu_schedule_active = schedule_active
 
     def _update_output_status(self, decision: AutomationDecision, schedule: ScheduleDecision, manual: ManualControlDecision) -> None:
         cwu_sources = []
