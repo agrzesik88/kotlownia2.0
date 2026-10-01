@@ -23,6 +23,8 @@
     .chart-wrap { position:relative; }
     .chart-grid { stroke:#475569; stroke-width:1; stroke-dasharray:4 4; }
     .chart-axis-label { font-size:13px; fill:#94a3b8; }
+    .chart-time-label { font-size:12px; fill:#94a3b8; }
+    .chart-last-label { font-size:13px; font-weight:700; }
     .error { background: #7f1d1d; }
     svg { width: 100%; height: 230px; background: #111827; border-radius: 10px; }
     table { width: 100%; border-collapse: collapse; }
@@ -111,7 +113,7 @@
     <p class="muted">Zmiana jest zapisywana do konfiguracji runtime. Sterownik zastosuje ją w kolejnym cyklu.</p>
     <div id="automationSaveStatus"></div>
   </section>
-  <section><h2>Historia</h2><div class="chart-wrap"><svg id="chart" viewBox="0 0 1000 230" preserveAspectRatio="none"></svg></div></section>
+  <section><h2>Historia</h2><div class="chart-wrap"><svg id="chart" viewBox="0 0 1000 270" preserveAspectRatio="none"></svg></div></section>
   <section>
     <div class="schedule-head"><h2>Harmonogram</h2><button id="save">Zapisz</button></div>
     <label>Strefa czasowa <input id="timezone" value="Europe/Warsaw"></label>
@@ -170,7 +172,7 @@ saveAutomation.onclick=async()=>{
 function draw(rows){
  const svg=document.getElementById('chart');
  if(rows.length<2){svg.innerHTML='';return}
- const width=1000,height=230,left=55,right=15,top=15,bottom=28;
+ const width=1000,height=270,left=55,right=15,top=28,bottom=48;
  const plotW=width-left-right,plotH=height-top-bottom;
  const temp=rows.map(x=>x.pipe_temperature_c).filter(x=>x!=null);
  const pellet=rows.map(x=>x.pellet_level_percent).filter(x=>x!=null);
@@ -180,7 +182,13 @@ function draw(rows){
  const x=(i)=>left+i*plotW/(rows.length-1);
  const pts=(key)=>rows.map((r,i)=>r[key]==null?'':`${x(i)},${y(r[key])}`).filter(Boolean).join(' ');
  const grid=Array.from({length:6},(_,i)=>{const v=yMin+(yMax-yMin)*i/5;return `<line class="chart-grid" x1="${left}" x2="${width-right}" y1="${y(v)}" y2="${y(v)}"/><text class="chart-axis-label" x="5" y="${y(v)+4}">${v.toFixed(0)}</text>`}).join('');
- svg.innerHTML=`${grid}<polyline fill="none" stroke="#f97316" stroke-width="4" points="${pts('pipe_temperature_c')}"/><polyline fill="none" stroke="#22c55e" stroke-width="4" points="${pts('pellet_level_percent')}"/><text x="${left+10}" y="13" fill="#f97316">temperatura [°C]</text><text x="${left+150}" y="13" fill="#22c55e">pellet [%]</text>`;
+ const firstTime=new Date(rows[0].recorded_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+ const midTime=new Date(rows[Math.floor((rows.length-1)/2)].recorded_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+ const lastTime=new Date(rows[rows.length-1].recorded_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+ const last=rows[rows.length-1]; const lastTemp=last.pipe_temperature_c; const lastPellet=last.pellet_level_percent;
+ const timeLabels=`<text class="chart-time-label" text-anchor="start" x="${left}" y="${height-12}">${firstTime}</text><text class="chart-time-label" text-anchor="middle" x="${left+plotW/2}" y="${height-12}">${midTime}</text><text class="chart-time-label" text-anchor="end" x="${width-right}" y="${height-12}">${lastTime}</text>`;
+ const lastLabels=`<circle cx="${x(rows.length-1)}" cy="${y(lastTemp)}" r="5" fill="#f97316"/><text class="chart-last-label" fill="#f97316" text-anchor="end" x="${x(rows.length-1)-10}" y="${y(lastTemp)-9}">${lastTemp==null?'—':Number(lastTemp).toFixed(1)+' °C'}</text><circle cx="${x(rows.length-1)}" cy="${y(lastPellet)}" r="5" fill="#22c55e"/><text class="chart-last-label" fill="#22c55e" text-anchor="end" x="${x(rows.length-1)-10}" y="${y(lastPellet)+18}">${lastPellet==null?'—':Number(lastPellet).toFixed(1)+' %'}</text>`;
+ svg.innerHTML=`${grid}<polyline fill="none" stroke="#f97316" stroke-width="4" points="${pts('pipe_temperature_c')}"/><polyline fill="none" stroke="#22c55e" stroke-width="4" points="${pts('pellet_level_percent')}"/>${lastLabels}<text x="${left+10}" y="16" fill="#f97316">temperatura [°C]</text><text x="${left+150}" y="16" fill="#22c55e">pellet [%]</text>${timeLabels}`;
 }
 function renderSchedule(){timezone.value=schedule.timezone;schedules.innerHTML=scheduleDefs.map(([key,title])=>{const o=schedule[key]||{enabled:false,windows:[]};return `<div class="card" data-key="${key}" style="margin-top:12px"><label><input type="checkbox" class="enabled" ${o.enabled?'checked':''}> <strong>${title}</strong></label><div class="rows">${(o.windows||[]).map(rowHtml).join('')}</div><button class="add" type="button">Dodaj okno</button></div>`}).join('');document.querySelectorAll('.add').forEach(b=>b.onclick=()=>{b.parentElement.querySelector('.rows').insertAdjacentHTML('beforeend',rowHtml({start:'06:00',end:'06:10',weekdays:['mon','tue','wed','thu','fri']}))});document.querySelectorAll('.remove').forEach(bindRemove)}
 function rowHtml(w){return `<div class="schedule-row"><input class="start" type="time" value="${w.start}"><input class="end" type="time" value="${w.end}"><input class="days" value="${w.weekdays.join(',')}"><button class="remove" type="button">Usuń</button></div>`}
