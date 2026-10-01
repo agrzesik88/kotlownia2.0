@@ -8,6 +8,7 @@ loop_interval_seconds = 1.0
 simulation = false
 heating_available_c = 45.0
 read_interval_seconds = 10
+max_consecutive_failures = 5
 simulation_value_c = 20.0
 # Przy kilku czujnikach DS18B20 odkomentuj i wpisz właściwy identyfikator:
 sensor_file = "/sys/bus/w1/devices/28-3ce1d4438132/w1_slave"

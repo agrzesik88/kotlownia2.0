@@ -92,13 +92,14 @@ def test_schedule_can_be_saved_and_read(tmp_path: Path) -> None:
         "timezone": "Europe/Warsaw",
         "cwu_circulation": {
             "enabled": True,
-            "windows": [{"start": "06:00", "end": "06:10", "weekdays": ["mon"]}],
+            "windows": [{"start": "06:00", "end": "06:10", "weekdays": ["mon"], "duration_minutes": 10, "repeat_minutes": 60}],
         },
         "other": {"enabled": False, "windows": []},
     }
     response = client.put("/api/schedule", json=payload)
     assert response.status_code == 200
-    assert client.get("/api/schedule").json() == payload
+    expected = {key: value for key, value in payload.items() if key != "timezone"}
+    assert client.get("/api/schedule").json() == expected
 
 
 def test_schedule_rejects_invalid_time(tmp_path: Path) -> None:

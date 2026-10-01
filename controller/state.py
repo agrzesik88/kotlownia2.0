@@ -21,6 +21,8 @@ class ControllerState:
     pellet_low: bool = False
     pellet_sensor_consecutive_failures: int = 0
     pellet_sensor_stale: bool = False
+    temperature_sensor_consecutive_failures: int = 0
+    temperature_sensor_stale: bool = False
     scheduler_enabled: bool = False
     cwu_schedule_active: bool = False
     other_schedule_active: bool = False
