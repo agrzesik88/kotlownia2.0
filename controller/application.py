@@ -131,31 +131,45 @@ class ControllerApplication:
             heating_detected = temperature >= self.config.temperature.heating_available_c
             schedule = self.scheduler.evaluate() if self.scheduler is not None else ScheduleDecision(False, False)
             manual = self.manual_control.evaluate() if self.manual_control is not None else ManualControlDecision()
-            # Harmonogram ma najwyższy priorytet. Cyrkulacja CWU i wyjście "Inne"
-            # są sterowane wyłącznie przez harmonogram lub sterowanie ręczne.
-            cwu_circulation_on = schedule.cwu_circulation_requested or manual.cwu_circulation_requested
-            other_on = schedule.other_requested or manual.other_requested
-
-            # Automatyka działa wyłącznie na pompę bojlera.
+            # Priorytet sterowania: RĘCZNE > HARMONOGRAM > AUTOMATYKA.
+            # Automatyka dotyczy wyłącznie pompy bojlera.
             decision = self.automation.evaluate(
                 AutomationInput(
                     pipe_temperature_c=temperature,
                     pellet_level_percent=pellet_level,
                     pellet_heating_detected=heating_detected,
                     monotonic_seconds=now,
-                    boiler_loading_requested=manual.boiler_loading_requested,
-                    pellet_boiler_power_override=manual.pellet_boiler_power_override,
+                    boiler_loading_requested=False,
+                    pellet_boiler_power_override=None,
                 )
             )
 
-            # Ręczne Włącz ma pierwszeństwo przed automatyką.
-            # Harmonogram (jeżeli w przyszłości obejmie to wyjście) powinien
-            # być rozstrzygany wcześniej niż sterowanie ręczne.
+            # Ręczne sterowanie zawsze ma pierwszeństwo. Jeżeli nie ma
+            # wymuszenia ręcznego, harmonogram ma pierwszeństwo przed automatyką.
             decision = replace(
                 decision,
-                cwu_circulation_on=cwu_circulation_on,
-                boiler_loading_on=decision.boiler_loading_on or manual.boiler_loading_requested,
-                other_on=other_on,
+                cwu_circulation_on=(
+                    manual.cwu_circulation_requested
+                    if manual.cwu_circulation_active
+                    else schedule.cwu_circulation_requested
+                ),
+                boiler_loading_on=(
+                    manual.boiler_loading_requested
+                    if manual.boiler_loading_active
+                    else schedule.boiler_loading_requested
+                    if schedule.boiler_loading_requested
+                    else decision.boiler_loading_on
+                ),
+                other_on=(
+                    manual.other_requested
+                    if manual.other_active
+                    else schedule.other_requested
+                ),
+                pellet_boiler_power_on=(
+                    manual.pellet_boiler_power_override
+                    if manual.pellet_boiler_power_override is not None
+                    else decision.pellet_boiler_power_on
+                ),
             )
             self.relays.apply(
                 cwu_circulation_on=decision.cwu_circulation_on,
