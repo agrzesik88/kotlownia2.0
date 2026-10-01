@@ -46,7 +46,7 @@ def test_loading_starts_at_45_degrees() -> None:
     )
     assert decision.state is BoilerState.BOILER_LOADING
     assert decision.boiler_loading_on
-    assert decision.other_on
+    assert not decision.other_on
 
 
 def test_loading_runs_for_configured_ten_minutes() -> None:
@@ -128,7 +128,7 @@ def test_other_can_run_together_with_loading_pump() -> None:
         )
     )
     assert decision.boiler_loading_on
-    assert not decision.other_on
+    assert decision.other_on
 
 
 def test_other_can_start_after_loading_finishes() -> None:
