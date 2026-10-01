@@ -201,6 +201,7 @@ class ControllerApplication:
             self.state.last_error = None
             self._publish_recovery_if_needed()
             self._update_pellet_events(now, pellet_level, decision.pellet_low)
+            self._update_alerts()
         except Exception as exc:
             decision = self.automation.fail_safe(str(exc))
             self.relays.apply(
@@ -218,6 +219,13 @@ class ControllerApplication:
                 "pellet_boiler_power": {"state": "ON", "requested": "ON", "mode": "AUTO", "reason": "Tryb awaryjny pozostawia zasilanie pieca włączone"},
             }
             self.state.last_error = str(exc)
+            self.state.alerts = [
+                {
+                    "severity": "ERROR",
+                    "code": "CONTROLLER_ERROR",
+                    "message": f"Błąd sterownika: {exc}",
+                }
+            ]
             if not self._had_error:
                 self.event_bus.publish(
                     ControllerEvent(
@@ -325,6 +333,45 @@ class ControllerApplication:
                 "reason": power_reason,
             },
         }
+
+    def _update_alerts(self) -> None:
+        alerts: list[dict[str, str]] = []
+
+        if self.state.pellet_low:
+            alerts.append(
+                {
+                    "severity": "WARNING",
+                    "code": "PELLET_LOW",
+                    "message": (
+                        "Niski poziom pelletu: "
+                        f"{self.state.pellet_level_percent:.1f}%"
+                    ),
+                }
+            )
+
+        if self.state.pellet_sensor_stale:
+            alerts.append(
+                {
+                    "severity": "WARNING",
+                    "code": "PELLET_SENSOR_STALE",
+                    "message": (
+                        "HC-SR04 nie dostarcza poprawnych pomiarów. "
+                        "Używany jest ostatni poprawny odczyt "
+                        f"({self.state.pellet_sensor_consecutive_failures} błędów)."
+                    ),
+                }
+            )
+
+        if self.state.last_error:
+            alerts.append(
+                {
+                    "severity": "ERROR",
+                    "code": "CONTROLLER_ERROR",
+                    "message": f"Błąd sterownika: {self.state.last_error}",
+                }
+            )
+
+        self.state.alerts = alerts
 
     def _publish_recovery_if_needed(self) -> None:
         if not self._had_error:
