@@ -32,7 +32,7 @@ simulation_level_percent = 75.0
 active_low = true
 cwu_circulation_gpio = 6
 boiler_loading_gpio = 13
-electric_heater_gpio = 19
+other_gpio = 19
 pellet_boiler_power_gpio = 26
 
 [automation]
