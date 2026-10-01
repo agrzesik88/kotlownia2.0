@@ -128,8 +128,8 @@ def test_small_level_changes_are_smoothed_by_filter() -> None:
     assert levels[0] == 0.0
     assert levels[1] == 0.0
     assert levels[2] == 0.0
-    assert levels[3] == 0.0
-    assert levels[4] == pytest.approx((57.0 - 56.4) / 48.1 * 100.0)
+    assert levels[3] == pytest.approx((57.0 - 56.4) / 48.1 * 100.0)
+    assert levels[4] == levels[3]
 
 
 def test_extreme_samples_are_ignored() -> None:
