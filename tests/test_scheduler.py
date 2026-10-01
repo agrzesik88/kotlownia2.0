@@ -91,3 +91,8 @@ def test_duration_cannot_exceed_range() -> None:
         assert "dłuższy niż zakres" in str(exc)
     else:
         raise AssertionError("Czas trwania nie może przekraczać zakresu")
+
+
+def test_disabled_schedule_window_does_not_match() -> None:
+    window = TimeWindow("06:00", "07:00", ("mon",), enabled=False)
+    assert not window.matches(dt("2026-07-20T06:05"))
