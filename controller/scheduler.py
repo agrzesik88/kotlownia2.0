@@ -182,7 +182,7 @@ def schedule_from_dict(raw: dict[str, Any]) -> ScheduleConfig:
                 )
             )
         return OutputSchedule(
-            enabled=bool(value.get("enabled", any(window.enabled for window in windows))),
+            enabled=any(window.enabled for window in windows),
             windows=tuple(windows),
         )
 
