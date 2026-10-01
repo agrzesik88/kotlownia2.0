@@ -5,7 +5,7 @@ from threading import Event
 from time import monotonic
 from typing import Callable
 
-from controller.automation import AutomationController, AutomationInput
+from controller.automation import AutomationController, AutomationDecision, AutomationInput
 from controller.config import ControllerConfig
 from controller.events import ControllerEvent, EventBus, EventType
 from controller.history import HistoryRepository
@@ -240,7 +240,7 @@ class ControllerApplication:
 
     def _update_output_status(
         self,
-        decision,
+        decision: AutomationDecision,
         schedule: ScheduleDecision,
         manual: ManualControlDecision,
     ) -> None:
