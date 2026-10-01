@@ -62,14 +62,17 @@ def test_set_after_close_is_rejected() -> None:
         relays.set_cwu_circulation(True)
 
 
-def test_loading_pump_and_other_interlock_is_preserved() -> None:
+def test_loading_pump_and_other_can_run_together() -> None:
     config = load_config()
     relays = RelayController(config.relays, simulation=True)
 
-    with pytest.raises(ValueError, match="nie mogą pracować równocześnie"):
-        relays.apply(
-            cwu_circulation_on=False,
-            boiler_loading_on=True,
-            other_on=True,
-            pellet_boiler_power_on=True,
-        )
+    changed = relays.apply(
+        cwu_circulation_on=False,
+        boiler_loading_on=True,
+        other_on=True,
+        pellet_boiler_power_on=True,
+    )
+
+    assert changed is True
+    assert relays.state.boiler_loading_on is True
+    assert relays.state.other_on is True
