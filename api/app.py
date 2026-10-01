@@ -157,7 +157,12 @@ def _read_automation_settings(config: ControllerConfig) -> dict[str, Any]:
     if not isinstance(raw, dict):
         return defaults
     try:
-        return AutomationSettingsPayload.model_validate(raw).model_dump()
+        return AutomationSettingsPayload.model_validate({
+            "boiler_loading_temperature_c": raw["boiler_loading_temperature_c"],
+            "boiler_loading_minutes": int(raw["boiler_loading_seconds"]) // 60,
+            "boiler_loading_recheck_minutes": int(raw["boiler_loading_recheck_seconds"]) // 60,
+            "pellet_low_level_percent": raw["pellet_low_level_percent"],
+        }).model_dump()
     except Exception:
         return defaults
 
