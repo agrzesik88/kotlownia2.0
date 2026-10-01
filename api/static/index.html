@@ -89,6 +89,9 @@
         <strong>Cyrkulacja CWU</strong>
         <div class="button-row">
           <button class="manual-on" data-manual="cwu_circulation">Włącz</button>
+          <button data-manual="cwu_circulation" data-minutes="5">5 min</button>
+          <button data-manual="cwu_circulation" data-minutes="15">15 min</button>
+          <button data-manual="cwu_circulation" data-minutes="30">30 min</button>
           <button class="secondary" data-stop="cwu_circulation">Wyłącz</button>
         </div>
         <div class="manual-status" id="cwuManualStatus">Nieaktywne</div>
@@ -97,6 +100,9 @@
         <strong>Pompa bojlera</strong>
         <div class="button-row">
           <button class="manual-on" data-manual="boiler_loading">Włącz</button>
+          <button data-manual="boiler_loading" data-minutes="5">5 min</button>
+          <button data-manual="boiler_loading" data-minutes="15">15 min</button>
+          <button data-manual="boiler_loading" data-minutes="30">30 min</button>
           <button class="secondary" data-stop="boiler_loading">Wyłącz</button>
         </div>
         <div class="manual-status" id="boilerManualStatus">Nieaktywne</div>
@@ -105,6 +111,9 @@
         <strong>Inne</strong>
         <div class="button-row">
           <button class="manual-on" data-manual="other">Włącz</button>
+          <button data-manual="other" data-minutes="5">5 min</button>
+          <button data-manual="other" data-minutes="15">15 min</button>
+          <button data-manual="other" data-minutes="30">30 min</button>
           <button class="secondary" data-stop="other">Wyłącz</button>
         </div>
         <div class="manual-status" id="otherManualStatus">Nieaktywne</div>
@@ -157,20 +166,21 @@ async function refresh(){try{const [s,h,e,a,al,ss]=await Promise.all([json('/api
  outputsEl=document.getElementById('outputs');outputsEl.innerHTML=Object.entries(a.outputs).map(([key,o])=>`<div class="output-card"><div class="output-head"><strong>${outputNames[key]||key}</strong><span class="output-state ${o.state==='ON'?'on':''}">${o.state}</span></div><div class="output-mode">Żądanie: ${o.requested||o.state} · Tryb: ${o.mode}</div><div class="output-reason">${o.reason}</div></div>`).join('');renderManualState(s);draw(h);events.innerHTML=e.map(x=>`<tr><td>${new Date(x.occurred_at).toLocaleString()}</td><td>${x.event_type}</td><td>${x.message}</td></tr>`).join('');scheduleStatus=ss;updateScheduleStatus();}catch(err){updated.textContent='Błąd połączenia: '+err.message}}
 function renderManualState(s){
  const activeClass=(active)=>'manual-status '+(active?'on':'');
- cwuManualStatus.textContent=s.cwu_manual_active?'Włączone ręcznie':'Nieaktywne';
- otherManualStatus.textContent=s.other_manual_active?'Włączone ręcznie':'Nieaktywne';
- boilerManualStatus.textContent=s.boiler_loading_manual_active?'Włączone ręcznie':'Nieaktywne';
+ const timed=(until)=>until?' do '+new Date(until).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}):'';
+ cwuManualStatus.textContent=s.cwu_manual_active?'Włączone ręcznie':(s.cwu_manual_until?'Czasowe'+timed(s.cwu_manual_until):'Nieaktywne');
+ otherManualStatus.textContent=s.other_manual_active?'Włączone ręcznie':(s.other_manual_until?'Czasowe'+timed(s.other_manual_until):'Nieaktywne');
+ boilerManualStatus.textContent=s.boiler_loading_manual_active?'Włączone ręcznie':(s.boiler_loading_manual_until?'Czasowe'+timed(s.boiler_loading_manual_until):'Nieaktywne');
  powerManualStatus.textContent=s.pellet_boiler_power_manual_active?(s.pellet_boiler_power_manual_override?'Włączone ręcznie':'Wyłączone ręcznie'):'Automatyka';
  cwuManualStatus.className=activeClass(s.cwu_manual_active);
  otherManualStatus.className=activeClass(s.other_manual_active);
  boilerManualStatus.className=activeClass(s.boiler_loading_manual_active);
  powerManualStatus.className='manual-status '+(s.pellet_boiler_power_manual_active?(s.pellet_boiler_power_manual_override?'on':'error'):'');
 }
-async function activateManual(button,output){
+async function activateManual(button,output,minutes){
  const statusMap={cwu_circulation:'cwuManualStatus',boiler_loading:'boilerManualStatus',other:'otherManualStatus',pellet_boiler_power_on:'powerManualStatus',pellet_boiler_power_off:'powerManualStatus'};
  const status=document.getElementById(statusMap[output]);
  button.disabled=true;status.textContent='Wysyłanie…';status.className='manual-status manual-pending';
- try{await json('/api/manual/activate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({output})});manualMessage.textContent='Polecenie przyjęte. Sterownik zastosuje je w najbliższym cyklu.';manualMessage.className='muted'}
+ try{await json('/api/manual/activate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({output,...(minutes?{duration_minutes:Number(minutes)}:{})})});manualMessage.textContent='Polecenie przyjęte. Sterownik zastosuje je w najbliższym cyklu.';manualMessage.className='muted'}
  catch(err){status.textContent='Błąd wysyłania';status.className='manual-status save-error';manualMessage.textContent='Błąd: '+err.message;manualMessage.className='save-error'}
  finally{button.disabled=false}
 }
@@ -182,7 +192,7 @@ async function stopManual(button,output){
  catch(err){status.textContent='Błąd wyłączania';status.className='manual-status save-error';manualMessage.textContent='Błąd: '+err.message;manualMessage.className='save-error'}
  finally{button.disabled=false}
 }
-document.querySelectorAll('[data-manual]').forEach(b=>b.onclick=()=>activateManual(b,b.dataset.manual));
+document.querySelectorAll('[data-manual]').forEach(b=>b.onclick=()=>activateManual(b,b.dataset.manual,b.dataset.minutes));
 document.querySelectorAll('[data-stop]').forEach(b=>b.onclick=()=>stopManual(b,b.dataset.stop));
 clearManual.onclick=async()=>{
  const button=clearManual;const originalText=button.textContent;
