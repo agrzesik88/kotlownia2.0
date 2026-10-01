@@ -166,18 +166,20 @@ function renderManualState(s){
  powerManualStatus.className='manual-status '+(s.pellet_boiler_power_manual_active?(s.pellet_boiler_power_manual_override?'on':'error'):'');
 }
 async function activateManual(button,output,minutes){
- const originalText=button.textContent;
- button.disabled=true;button.textContent='Wysyłanie…';manualMessage.textContent='Wysyłanie polecenia do sterownika…';manualMessage.className='manual-pending';
- try{await json('/api/manual/activate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({output,duration_minutes:Number(minutes)})});manualMessage.textContent='Polecenie przyjęte. Sterownik zastosuje je w najbliższym cyklu.';await refresh()}
- catch(err){manualMessage.textContent='Błąd: '+err.message;manualMessage.className='save-error'}
- finally{button.disabled=false;button.textContent=originalText}
+ const statusMap={cwu_circulation:'cwuManualStatus',boiler_loading:'boilerManualStatus',other:'otherManualStatus',pellet_boiler_power_on:'powerManualStatus',pellet_boiler_power_off:'powerManualStatus'};
+ const status=document.getElementById(statusMap[output]);
+ button.disabled=true;status.textContent='Wysyłanie…';status.className='manual-status manual-pending';
+ try{await json('/api/manual/activate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({output,duration_minutes:Number(minutes)})});manualMessage.textContent='Polecenie przyjęte. Sterownik zastosuje je w najbliższym cyklu.';manualMessage.className='muted';await refresh()}
+ catch(err){status.textContent='Błąd wysyłania';status.className='manual-status save-error';manualMessage.textContent='Błąd: '+err.message;manualMessage.className='save-error'}
+ finally{button.disabled=false}
 }
 async function stopManual(button,output){
- const originalText=button.textContent;
- button.disabled=true;button.textContent='Wyłączanie…';manualMessage.textContent='Wyłączanie sterowania ręcznego…';manualMessage.className='manual-pending';
- try{await json('/api/manual/deactivate/'+output,{method:'POST'});manualMessage.textContent='Polecenie wyłączenia przyjęte.';await refresh()}
- catch(err){manualMessage.textContent='Błąd: '+err.message;manualMessage.className='save-error'}
- finally{button.disabled=false;button.textContent=originalText}
+ const statusMap={cwu_circulation:'cwuManualStatus',boiler_loading:'boilerManualStatus',other:'otherManualStatus',pellet_boiler_power:'powerManualStatus'};
+ const status=document.getElementById(statusMap[output]);
+ button.disabled=true;status.textContent='Wyłączanie…';status.className='manual-status manual-pending';
+ try{await json('/api/manual/deactivate/'+output,{method:'POST'});manualMessage.textContent='Polecenie wyłączenia przyjęte.';manualMessage.className='muted';await refresh()}
+ catch(err){status.textContent='Błąd wyłączania';status.className='manual-status save-error';manualMessage.textContent='Błąd: '+err.message;manualMessage.className='save-error'}
+ finally{button.disabled=false}
 }
 document.querySelectorAll('[data-manual]').forEach(b=>b.onclick=()=>activateManual(b,b.dataset.manual,b.dataset.minutes));
 document.querySelectorAll('[data-stop]').forEach(b=>b.onclick=()=>stopManual(b,b.dataset.stop));
