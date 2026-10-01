@@ -32,7 +32,7 @@ class ControllerApplication:
         self.config = config
         self.stop_event = Event()
         self.clock = clock
-        self.electric_heater_requested = False
+        self.other_requested = False
         self.cwu_circulation_requested = False
         self._last_pellet_notification_at: float | None = None
         self._pellet_was_low = False
@@ -122,9 +122,9 @@ class ControllerApplication:
     def request_stop(self, *_args: object) -> None:
         self.stop_event.set()
 
-    def set_electric_heater_requested(self, requested: bool) -> None:
+    def set_other_requested(self, requested: bool) -> None:
         """Ręczne żądanie używane przez przyszłe API/tryb serwisowy."""
-        self.electric_heater_requested = requested
+        self.other_requested = requested
 
     def set_cwu_circulation_requested(self, requested: bool) -> None:
         self.cwu_circulation_requested = requested
@@ -148,10 +148,10 @@ class ControllerApplication:
                 if self.manual_control is not None
                 else ManualControlDecision()
             )
-            electric_heater_requested = (
-                self.electric_heater_requested
-                or schedule.electric_heater_requested
-                or manual.electric_heater_requested
+            other_requested = (
+                self.other_requested
+                or schedule.other_requested
+                or manual.other_requested
             )
             cwu_circulation_requested = (
                 self.cwu_circulation_requested
@@ -165,7 +165,7 @@ class ControllerApplication:
                     pellet_level_percent=pellet_level,
                     pellet_heating_detected=heating_detected,
                     monotonic_seconds=now,
-                    electric_heater_requested=electric_heater_requested,
+                    other_requested=other_requested,
                     cwu_circulation_requested=cwu_circulation_requested,
                     boiler_loading_requested=manual.boiler_loading_requested,
                     pellet_boiler_power_override=manual.pellet_boiler_power_override,
@@ -174,7 +174,7 @@ class ControllerApplication:
             self.relays.apply(
                 cwu_circulation_on=decision.cwu_circulation_on,
                 boiler_loading_on=decision.boiler_loading_on,
-                electric_heater_on=decision.electric_heater_on,
+                other_on=decision.other_on,
                 pellet_boiler_power_on=decision.pellet_boiler_power_on,
             )
 
@@ -186,15 +186,15 @@ class ControllerApplication:
             self.state.automation_reason = decision.reason
             self.state.scheduler_enabled = self.scheduler is not None
             self.state.cwu_schedule_active = schedule.cwu_circulation_requested
-            self.state.electric_heater_schedule_active = schedule.electric_heater_requested
+            self.state.other_schedule_active = schedule.other_requested
             self.state.manual_control_enabled = self.manual_control is not None
             self.state.cwu_manual_active = manual.cwu_circulation_requested
-            self.state.electric_heater_manual_active = manual.electric_heater_requested
+            self.state.other_manual_active = manual.other_requested
             self.state.boiler_loading_manual_active = manual.boiler_loading_requested
             self.state.pellet_boiler_power_manual_active = (manual.pellet_boiler_power_override is not None)
             self.state.pellet_boiler_power_manual_override = manual.pellet_boiler_power_override
             self.state.cwu_manual_until = manual.cwu_circulation_until
-            self.state.electric_heater_manual_until = manual.electric_heater_until
+            self.state.other_manual_until = manual.other_until
             self.state.boiler_loading_manual_until = manual.boiler_loading_until
             self.state.pellet_boiler_power_manual_until = manual.pellet_boiler_power_until
             self._update_output_status(decision, schedule, manual)
@@ -206,7 +206,7 @@ class ControllerApplication:
             self.relays.apply(
                 cwu_circulation_on=decision.cwu_circulation_on,
                 boiler_loading_on=decision.boiler_loading_on,
-                electric_heater_on=decision.electric_heater_on,
+                other_on=decision.other_on,
                 pellet_boiler_power_on=decision.pellet_boiler_power_on,
             )
             self.state.automation_state = decision.state.name
@@ -214,7 +214,7 @@ class ControllerApplication:
             self.state.output_status = {
                 "cwu_circulation": {"state": "OFF", "requested": "OFF", "mode": "AUTO", "reason": "Sterownik w trybie awaryjnym"},
                 "boiler_loading": {"state": "OFF", "requested": "OFF", "mode": "AUTO", "reason": "Sterownik w trybie awaryjnym"},
-                "electric_heater": {"state": "OFF", "requested": "OFF", "mode": "AUTO", "reason": "Sterownik w trybie awaryjnym"},
+                "other": {"state": "OFF", "requested": "OFF", "mode": "AUTO", "reason": "Sterownik w trybie awaryjnym"},
                 "pellet_boiler_power": {"state": "ON", "requested": "ON", "mode": "AUTO", "reason": "Tryb awaryjny pozostawia zasilanie pieca włączone"},
             }
             self.state.last_error = str(exc)
@@ -266,27 +266,27 @@ class ControllerApplication:
             boiler_mode = "AUTO"
             boiler_reason = "Automatyka nie wymaga teraz ładowania bojlera"
 
-        heater_sources = []
-        if manual.electric_heater_requested:
-            heater_sources.append("RĘCZNY")
-        if schedule.electric_heater_requested:
-            heater_sources.append("HARMONOGRAM")
-        heater_requested = (
-            self.electric_heater_requested
-            or manual.electric_heater_requested
-            or schedule.electric_heater_requested
+        other_sources = []
+        if manual.other_requested:
+            other_sources.append("RĘCZNY")
+        if schedule.other_requested:
+            other_sources.append("HARMONOGRAM")
+        other_requested = (
+            self.other_requested
+            or manual.other_requested
+            or schedule.other_requested
         )
-        if heater_sources:
-            heater_mode = " + ".join(heater_sources)
-            heater_reason = "Aktywne żądanie: " + " + ".join(heater_sources)
-            if decision.boiler_loading_on and not decision.electric_heater_on:
-                heater_reason = "Żądanie zablokowane — pracuje pompa bojlera"
-        elif self.electric_heater_requested:
-            heater_mode = "AUTO"
-            heater_reason = "Aktywne żądanie sterownika"
+        if other_sources:
+            other_mode = " + ".join(other_sources)
+            other_reason = "Aktywne żądanie: " + " + ".join(other_sources)
+            if decision.boiler_loading_on and not decision.other_on:
+                other_reason = "Żądanie zablokowane — pracuje pompa bojlera"
+        elif self.other_requested:
+            other_mode = "AUTO"
+            other_reason = "Aktywne żądanie sterownika"
         else:
-            heater_mode = "AUTO"
-            heater_reason = "Brak żądania grzania elektrycznego"
+            other_mode = "AUTO"
+            other_reason = "Brak żądania grzania elektrycznego"
 
         if manual.pellet_boiler_power_override is not None:
             power_mode = "RĘCZNY"
@@ -312,11 +312,11 @@ class ControllerApplication:
                 "mode": boiler_mode,
                 "reason": boiler_reason,
             },
-            "electric_heater": {
-                "state": "ON" if decision.electric_heater_on else "OFF",
-                "requested": "ON" if heater_requested else "OFF",
-                "mode": heater_mode,
-                "reason": heater_reason,
+            "other": {
+                "state": "ON" if decision.other_on else "OFF",
+                "requested": "ON" if other_requested else "OFF",
+                "mode": other_mode,
+                "reason": other_reason,
             },
             "pellet_boiler_power": {
                 "state": "ON" if decision.pellet_boiler_power_on else "OFF",
@@ -418,7 +418,7 @@ class ControllerApplication:
         relay_state = self.relays.state
         self.state.cwu_circulation_on = relay_state.cwu_circulation_on
         self.state.boiler_loading_on = relay_state.boiler_loading_on
-        self.state.electric_heater_on = relay_state.electric_heater_on
+        self.state.other_on = relay_state.other_on
         self.state.pellet_boiler_power_on = relay_state.pellet_boiler_power_on
 
     def run(self) -> None:
