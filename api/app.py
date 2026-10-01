@@ -7,7 +7,7 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from controller.config import ControllerConfig, load_config
 from controller.manual import ManualControlRepository
@@ -19,6 +19,15 @@ class ManualControlPayload(BaseModel):
 
     output: str
     duration_minutes: int
+
+
+class AutomationSettingsPayload(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    boiler_loading_temperature_c: float = Field(ge=-55.0, le=125.0)
+    boiler_loading_minutes: int = Field(gt=0, le=1440)
+    boiler_loading_recheck_minutes: int = Field(gt=0, le=10080)
+    pellet_low_level_percent: float = Field(ge=0.0, le=100.0)
 
 
 class SchedulePayload(BaseModel):
@@ -57,6 +66,26 @@ def create_app(config_path: str | Path = "config/settings.toml") -> FastAPI:
         if limit < 1 or limit > 500:
             raise HTTPException(400, "limit musi mieścić się w zakresie 1-500")
         return _read_events(config, limit)
+
+    @app.get("/api/automation-settings")
+    def get_automation_settings() -> dict[str, Any]:
+        return _read_automation_settings(config)
+
+    @app.put("/api/automation-settings")
+    def put_automation_settings(payload: AutomationSettingsPayload) -> dict[str, Any]:
+        path = config.application.state_file.parent / "automation_settings.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        data = payload.model_dump()
+        runtime_data = {
+            "boiler_loading_temperature_c": data["boiler_loading_temperature_c"],
+            "boiler_loading_seconds": data["boiler_loading_minutes"] * 60,
+            "boiler_loading_recheck_seconds": data["boiler_loading_recheck_minutes"] * 60,
+            "pellet_low_level_percent": data["pellet_low_level_percent"],
+        }
+        temporary = path.with_suffix(".tmp")
+        temporary.write_text(json.dumps(runtime_data, ensure_ascii=False), encoding="utf-8")
+        temporary.replace(path)
+        return data
 
     @app.get("/api/schedule")
     def get_schedule() -> dict[str, Any]:
@@ -115,6 +144,33 @@ def create_app(config_path: str | Path = "config/settings.toml") -> FastAPI:
         return {"status": "ok"}
 
     return app
+
+
+def _read_automation_settings(config: ControllerConfig) -> dict[str, Any]:
+    defaults = {
+        "boiler_loading_temperature_c": config.automation.boiler_loading_temperature_c,
+        "boiler_loading_minutes": config.automation.boiler_loading_seconds // 60,
+        "boiler_loading_recheck_minutes": config.automation.boiler_loading_recheck_seconds // 60,
+        "pellet_low_level_percent": config.automation.pellet_low_level_percent,
+    }
+    path = config.application.state_file.parent / "automation_settings.json"
+    if not path.is_file():
+        return defaults
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return defaults
+    if not isinstance(raw, dict):
+        return defaults
+    try:
+        return AutomationSettingsPayload.model_validate({
+            "boiler_loading_temperature_c": raw["boiler_loading_temperature_c"],
+            "boiler_loading_minutes": int(raw["boiler_loading_seconds"]) // 60,
+            "boiler_loading_recheck_minutes": int(raw["boiler_loading_recheck_seconds"]) // 60,
+            "pellet_low_level_percent": raw["pellet_low_level_percent"],
+        }).model_dump()
+    except Exception:
+        return defaults
 
 
 def _read_state(config: ControllerConfig) -> dict[str, Any]:

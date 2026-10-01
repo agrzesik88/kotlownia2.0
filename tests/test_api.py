@@ -105,3 +105,51 @@ def test_manual_control_rejects_unknown_output(tmp_path: Path) -> None:
         json={"output": "unknown_output", "duration_minutes": 10},
     )
     assert response.status_code == 422
+
+
+def test_automation_settings_can_be_saved_and_read(tmp_path: Path) -> None:
+    client = TestClient(create_app(write_config(tmp_path)))
+    payload = {
+        "boiler_loading_temperature_c": 50.5,
+        "boiler_loading_minutes": 15,
+        "boiler_loading_recheck_minutes": 120,
+        "pellet_low_level_percent": 20.0,
+    }
+    response = client.put("/api/automation-settings", json=payload)
+    assert response.status_code == 200
+    assert response.json() == payload
+    assert client.get("/api/automation-settings").json() == payload
+
+
+def test_automation_settings_store_runtime_values_in_seconds(tmp_path: Path) -> None:
+    client = TestClient(create_app(write_config(tmp_path)))
+    payload = {
+        "boiler_loading_temperature_c": 50.0,
+        "boiler_loading_minutes": 15,
+        "boiler_loading_recheck_minutes": 120,
+        "pellet_low_level_percent": 20.0,
+    }
+
+    response = client.put("/api/automation-settings", json=payload)
+
+    assert response.status_code == 200
+    stored = json.loads(
+        (tmp_path / "automation_settings.json").read_text(encoding="utf-8")
+    )
+    assert stored["boiler_loading_seconds"] == 900
+    assert stored["boiler_loading_recheck_seconds"] == 7200
+    assert client.get("/api/automation-settings").json() == payload
+
+
+def test_automation_settings_reject_invalid_values(tmp_path: Path) -> None:
+    client = TestClient(create_app(write_config(tmp_path)))
+    response = client.put(
+        "/api/automation-settings",
+        json={
+            "boiler_loading_temperature_c": 200,
+            "boiler_loading_minutes": 0,
+            "boiler_loading_recheck_minutes": 60,
+            "pellet_low_level_percent": 15,
+        },
+    )
+    assert response.status_code == 422

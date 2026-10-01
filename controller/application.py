@@ -38,6 +38,9 @@ class ControllerApplication:
         self._pellet_was_low = False
         self._had_error = False
         self._last_history_recorded_at: float | None = None
+        self._automation_settings_path = (
+            config.application.state_file.parent / "automation_settings.json"
+        )
 
         email = config.email_notifications
         self.notifications = NotificationService(
@@ -95,6 +98,27 @@ class ControllerApplication:
             manual_control_enabled=config.manual_control.enabled,
         )
 
+    def _load_runtime_automation_settings(self) -> None:
+        if not self._automation_settings_path.is_file():
+            return
+
+        import json
+
+        try:
+            raw = json.loads(
+                self._automation_settings_path.read_text(encoding="utf-8")
+            )
+            if not isinstance(raw, dict):
+                return
+            self.automation.update_settings(
+                boiler_loading_temperature_c=float(raw["boiler_loading_temperature_c"]),
+                boiler_loading_seconds=float(raw["boiler_loading_seconds"]),
+                boiler_loading_recheck_seconds=float(raw["boiler_loading_recheck_seconds"]),
+                pellet_low_level_percent=float(raw["pellet_low_level_percent"]),
+            )
+        except (KeyError, TypeError, ValueError, OSError, json.JSONDecodeError) as exc:
+            logging.warning("Nie udało się odczytać ustawień automatyki: %s", exc)
+
     def request_stop(self, *_args: object) -> None:
         self.stop_event.set()
 
@@ -108,6 +132,7 @@ class ControllerApplication:
     def run_once(self) -> ControllerState:
         now = self.clock()
         try:
+            self._load_runtime_automation_settings()
             temperature = self.temperature.read_celsius()
             pellet_level = self.pellet.read_level_percent()
             heating_detected = (
