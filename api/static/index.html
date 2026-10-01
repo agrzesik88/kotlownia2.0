@@ -15,7 +15,12 @@
     .card, section { background: #1f2937; border: 1px solid #374151; border-radius: 14px; padding: 18px; }
     .value { font-size: 2rem; font-weight: 700; margin-top: 8px; }
     section { margin-top: 18px; }
-    .outputs { display: flex; flex-wrap: wrap; gap: 10px; }
+    .outputs { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:10px; }
+    .output-card { padding:12px; border:1px solid #374151; border-radius:10px; background:#111827; }
+    .output-head { display:flex; justify-content:space-between; gap:10px; align-items:center; }
+    .output-state { font-weight:700; }
+    .output-reason { margin-top:6px; font-size:.9rem; color:#94a3b8; }
+    .output-mode { margin-top:6px; font-size:.8rem; color:#cbd5e1; }
     .pill { padding: 7px 11px; border-radius: 999px; background: #374151; }
      .on { background: #166534; }
     .save-success { margin-top:10px; padding:10px 12px; border-radius:8px; background:#166534; color:#dcfce7; font-weight:600; }
@@ -129,9 +134,10 @@ const scheduleDefs=[['cwu_circulation','Cyrkulacja CWU'],['electric_heater','Grz
 let schedule={};
 function fmt(v,s=''){return v==null?'—':Number(v).toFixed(1)+s}
 async function json(url,opts){const r=await fetch(url,opts);if(!r.ok)throw new Error(await r.text());return r.json()}
-async function refresh(){try{const [s,h,e]=await Promise.all([json('/api/status'),json('/api/history?limit=120'),json('/api/events?limit=20')]);
+async function refresh(){try{const [s,h,e,a]=await Promise.all([json('/api/status'),json('/api/history?limit=120'),json('/api/events?limit=20'),json('/api/automation-status')]);
  temp.textContent=fmt(s.pipe_temperature_c,'°C');pellet.textContent=fmt(s.pellet_level_percent,'%');state.textContent=s.automation_state;mode.textContent=s.simulation_mode?'SYMULACJA':'REALNY';updated.textContent='Aktualizacja: '+new Date(s.updated_at).toLocaleString();reason.textContent=s.automation_reason+(s.last_error?' — '+s.last_error:'');
- outputsEl=document.getElementById('outputs');outputsEl.innerHTML=outputs.map(([k,n])=>`<span class="pill ${s[k]?'on':''}">${n}: ${s[k]?'ON':'OFF'}</span>`).join('');renderManualState(s);draw(h);events.innerHTML=e.map(x=>`<tr><td>${new Date(x.occurred_at).toLocaleString()}</td><td>${x.event_type}</td><td>${x.message}</td></tr>`).join('');}catch(err){updated.textContent='Błąd połączenia: '+err.message}}
+ const outputNames={cwu_circulation:'Cyrkulacja CWU',boiler_loading:'Pompa bojlera',electric_heater:'Grzałka',pellet_boiler_power:'Zasilanie pieca'};
+ outputsEl=document.getElementById('outputs');outputsEl.innerHTML=Object.entries(a.outputs).map(([key,o])=>`<div class="output-card"><div class="output-head"><strong>${outputNames[key]||key}</strong><span class="output-state ${o.state==='ON'?'on':''}">${o.state}</span></div><div class="output-mode">Tryb: ${o.mode}</div><div class="output-reason">${o.reason}</div></div>`).join('');renderManualState(s);draw(h);events.innerHTML=e.map(x=>`<tr><td>${new Date(x.occurred_at).toLocaleString()}</td><td>${x.event_type}</td><td>${x.message}</td></tr>`).join('');}catch(err){updated.textContent='Błąd połączenia: '+err.message}}
 function untilText(value){return value?'Aktywne do '+new Date(value).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}):'Nieaktywne'}
 function renderManualState(s){
  cwuManualStatus.textContent=untilText(s.cwu_manual_until);
