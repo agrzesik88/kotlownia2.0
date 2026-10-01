@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import replace
 from threading import Event
 from time import monotonic
 from typing import Callable
@@ -130,20 +131,44 @@ class ControllerApplication:
             heating_detected = temperature >= self.config.temperature.heating_available_c
             schedule = self.scheduler.evaluate() if self.scheduler is not None else ScheduleDecision(False, False)
             manual = self.manual_control.evaluate() if self.manual_control is not None else ManualControlDecision()
-            other_requested = self.other_requested or schedule.other_requested or manual.other_requested
-            cwu_circulation_requested = self.cwu_circulation_requested or schedule.cwu_circulation_requested or manual.cwu_circulation_requested
-
+            # Priorytet sterowania: RĘCZNE > HARMONOGRAM > AUTOMATYKA.
+            # Automatyka dotyczy wyłącznie pompy bojlera.
             decision = self.automation.evaluate(
                 AutomationInput(
                     pipe_temperature_c=temperature,
                     pellet_level_percent=pellet_level,
                     pellet_heating_detected=heating_detected,
                     monotonic_seconds=now,
-                    other_requested=other_requested,
-                    cwu_circulation_requested=cwu_circulation_requested,
-                    boiler_loading_requested=manual.boiler_loading_requested,
-                    pellet_boiler_power_override=manual.pellet_boiler_power_override,
+                    boiler_loading_requested=False,
+                    pellet_boiler_power_override=None,
                 )
+            )
+
+            # Ręczne sterowanie ma zawsze pierwszeństwo.
+            # Jeżeli nie ma ręcznego wymuszenia, harmonogram ma pierwszeństwo
+            # przed automatyką. Cyrkulacja CWU i "Inne" nie są sterowane przez automatykę.
+            decision = replace(
+                decision,
+                cwu_circulation_on=(
+                    manual.cwu_circulation_requested
+                    if manual.cwu_circulation_requested
+                    else schedule.cwu_circulation_requested
+                ),
+                boiler_loading_on=(
+                    manual.boiler_loading_requested
+                    if manual.boiler_loading_requested
+                    else decision.boiler_loading_on
+                ),
+                other_on=(
+                    manual.other_requested
+                    if manual.other_requested
+                    else schedule.other_requested
+                ),
+                pellet_boiler_power_on=(
+                    manual.pellet_boiler_power_override
+                    if manual.pellet_boiler_power_override is not None
+                    else decision.pellet_boiler_power_on
+                ),
             )
             self.relays.apply(
                 cwu_circulation_on=decision.cwu_circulation_on,
@@ -261,13 +286,15 @@ class ControllerApplication:
         self._last_cwu_schedule_active = schedule_active
 
     def _update_output_status(self, decision: AutomationDecision, schedule: ScheduleDecision, manual: ManualControlDecision) -> None:
-        cwu_sources = []
-        if manual.cwu_circulation_requested:
-            cwu_sources.append("RĘCZNY")
         if schedule.cwu_circulation_requested:
-            cwu_sources.append("HARMONOGRAM")
-        cwu_mode = " + ".join(cwu_sources) if cwu_sources else "AUTO"
-        cwu_reason = "Aktywne żądanie: " + " + ".join(cwu_sources) if cwu_sources else "Brak żądania cyrkulacji"
+            cwu_mode = "HARMONOGRAM"
+            cwu_reason = "Harmonogram ma pierwszeństwo"
+        elif manual.cwu_circulation_requested:
+            cwu_mode = "RĘCZNY"
+            cwu_reason = "Aktywne żądanie ręczne"
+        else:
+            cwu_mode = "AUTO"
+            cwu_reason = "Brak żądania cyrkulacji"
 
         if manual.boiler_loading_requested:
             boiler_mode = "RĘCZNY"
@@ -279,23 +306,16 @@ class ControllerApplication:
             boiler_mode = "AUTO"
             boiler_reason = "Automatyka nie wymaga teraz ładowania bojlera"
 
-        other_sources = []
-        if manual.other_requested:
-            other_sources.append("RĘCZNY")
         if schedule.other_requested:
-            other_sources.append("HARMONOGRAM")
-        other_requested = self.other_requested or manual.other_requested or schedule.other_requested
-        if other_sources:
-            other_mode = " + ".join(other_sources)
-            other_reason = "Aktywne żądanie: " + " + ".join(other_sources)
-            if decision.boiler_loading_on and not decision.other_on:
-                other_reason = "Żądanie zablokowane — pracuje pompa bojlera"
-        elif self.other_requested:
-            other_mode = "AUTO"
-            other_reason = "Aktywne żądanie sterownika"
+            other_mode = "HARMONOGRAM"
+            other_reason = "Harmonogram ma pierwszeństwo"
+        elif manual.other_requested:
+            other_mode = "RĘCZNY"
+            other_reason = "Aktywne żądanie ręczne"
         else:
             other_mode = "AUTO"
-            other_reason = "Brak żądania grzania elektrycznego"
+            other_reason = "Brak żądania"
+        other_requested = schedule.other_requested or manual.other_requested
 
         if manual.pellet_boiler_power_override is not None:
             power_mode = "RĘCZNY"
@@ -307,7 +327,7 @@ class ControllerApplication:
         self.state.output_status = {
             "cwu_circulation": {
                 "state": "ON" if decision.cwu_circulation_on else "OFF",
-                "requested": "ON" if (self.cwu_circulation_requested or manual.cwu_circulation_requested or schedule.cwu_circulation_requested) else "OFF",
+                "requested": "ON" if (manual.cwu_circulation_requested or schedule.cwu_circulation_requested) else "OFF",
                 "mode": cwu_mode,
                 "reason": cwu_reason,
             },

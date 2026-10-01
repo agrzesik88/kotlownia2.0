@@ -9,13 +9,15 @@ from typing import Callable
 
 @dataclass(frozen=True, slots=True)
 class ManualControlState:
+    cwu_circulation_active: bool = False
     cwu_circulation_until: str | None = None
+    other_active: bool = False
     other_until: str | None = None
+    boiler_loading_active: bool = False
     boiler_loading_until: str | None = None
     pellet_boiler_power_override: bool | None = None
-    pellet_boiler_power_until: str | None = None
 
-    def to_dict(self) -> dict[str, str | bool | None]:
+    def to_dict(self) -> dict[str, bool | str | None]:
         return asdict(self)
 
 
@@ -47,69 +49,75 @@ class ManualControlRepository:
             raise ValueError("Nieprawidłowy plik sterowania ręcznego") from exc
         if not isinstance(raw, dict):
             raise ValueError("Nieprawidłowy format sterowania ręcznego")
+
+        now = self._ensure_utc(self._now())
+        if any(key in raw for key in ("cwu_circulation_until", "other_until", "boiler_loading_until")):
+            return ManualControlState(
+                cwu_circulation_active=bool(raw.get("cwu_circulation_active", False)),
+                cwu_circulation_until=self._legacy_timestamp(raw.get("cwu_circulation_until"), now),
+                other_active=bool(raw.get("other_active", False)),
+                other_until=self._legacy_timestamp(raw.get("other_until"), now),
+                boiler_loading_active=bool(raw.get("boiler_loading_active", False)),
+                boiler_loading_until=self._legacy_timestamp(raw.get("boiler_loading_until"), now),
+                pellet_boiler_power_override=self._legacy_power(raw, now),
+            )
+
         power_override = raw.get("pellet_boiler_power_override")
         if power_override is not None and not isinstance(power_override, bool):
             raise ValueError("Wymuszenie zasilania pieca musi być wartością logiczną")
+
         return ManualControlState(
-            cwu_circulation_until=self._validate_timestamp(raw.get("cwu_circulation_until")),
-            other_until=self._validate_timestamp(raw.get("other_until")),
-            boiler_loading_until=self._validate_timestamp(raw.get("boiler_loading_until")),
+            cwu_circulation_active=bool(raw.get("cwu_circulation_active", False)),
+            cwu_circulation_until=self._validate_timestamp(raw.get("cwu_circulation_until"), now),
+            other_active=bool(raw.get("other_active", False)),
+            other_until=self._validate_timestamp(raw.get("other_until"), now),
+            boiler_loading_active=bool(raw.get("boiler_loading_active", False)),
+            boiler_loading_until=self._validate_timestamp(raw.get("boiler_loading_until"), now),
             pellet_boiler_power_override=power_override,
-            pellet_boiler_power_until=self._validate_timestamp(raw.get("pellet_boiler_power_until")),
         )
 
     def evaluate(self) -> ManualControlDecision:
         state = self.load()
         now = self._ensure_utc(self._now())
-        cwu_active = self._is_active(state.cwu_circulation_until, now)
-        other_active = self._is_active(state.other_until, now)
-        loading_active = self._is_active(state.boiler_loading_until, now)
-        power_active = self._is_active(state.pellet_boiler_power_until, now)
-        cleaned = ManualControlState(
-            cwu_circulation_until=state.cwu_circulation_until if cwu_active else None,
-            other_until=state.other_until if other_active else None,
-            boiler_loading_until=state.boiler_loading_until if loading_active else None,
-            pellet_boiler_power_override=(state.pellet_boiler_power_override if power_active else None),
-            pellet_boiler_power_until=state.pellet_boiler_power_until if power_active else None,
-        )
-        if cleaned != state:
-            self.save(cleaned)
+        cwu_timed = self._is_active(state.cwu_circulation_until, now)
+        other_timed = self._is_active(state.other_until, now)
+        boiler_timed = self._is_active(state.boiler_loading_until, now)
         return ManualControlDecision(
-            cwu_circulation_requested=cwu_active,
-            other_requested=other_active,
-            boiler_loading_requested=loading_active,
-            pellet_boiler_power_override=cleaned.pellet_boiler_power_override,
-            cwu_circulation_until=cleaned.cwu_circulation_until,
-            other_until=cleaned.other_until,
-            boiler_loading_until=cleaned.boiler_loading_until,
-            pellet_boiler_power_until=cleaned.pellet_boiler_power_until,
+            cwu_circulation_requested=state.cwu_circulation_active or cwu_timed,
+            other_requested=state.other_active or other_timed,
+            boiler_loading_requested=state.boiler_loading_active or boiler_timed,
+            pellet_boiler_power_override=state.pellet_boiler_power_override,
+            cwu_circulation_until=state.cwu_circulation_until if cwu_timed else None,
+            other_until=state.other_until if other_timed else None,
+            boiler_loading_until=state.boiler_loading_until if boiler_timed else None,
+            pellet_boiler_power_until=None,
         )
 
-    def activate(self, output: str, duration_minutes: int) -> ManualControlState:
-        limits = {
-            "cwu_circulation": (1, 60),
-            "other": (1, 120),
-            "boiler_loading": (1, 60),
-            "pellet_boiler_power_on": (1, 240),
-            "pellet_boiler_power_off": (1, 240),
-        }
-        if output not in limits:
+    def activate(self, output: str, duration_minutes: int | None = None) -> ManualControlState:
+        allowed = {"cwu_circulation", "other", "boiler_loading", "pellet_boiler_power_on", "pellet_boiler_power_off"}
+        if output not in allowed:
             raise ValueError("Nieobsługiwane wyjście sterowania ręcznego")
-        minimum, maximum = limits[output]
-        if not minimum <= duration_minutes <= maximum:
-            raise ValueError(f"Czas musi mieścić się w zakresie {minimum}-{maximum} minut")
+        if duration_minutes is not None and duration_minutes < 1:
+            raise ValueError("Czas musi być większy od 0 minut")
+
         state = self.load()
-        expires_at = (self._ensure_utc(self._now()) + timedelta(minutes=duration_minutes)).isoformat()
         values = state.to_dict()
+        expires_at = (
+            self._ensure_utc(self._now()) + timedelta(minutes=duration_minutes)
+        ).isoformat() if duration_minutes is not None else None
+
         if output == "cwu_circulation":
+            values["cwu_circulation_active"] = duration_minutes is None
             values["cwu_circulation_until"] = expires_at
         elif output == "other":
+            values["other_active"] = duration_minutes is None
             values["other_until"] = expires_at
         elif output == "boiler_loading":
+            values["boiler_loading_active"] = duration_minutes is None
             values["boiler_loading_until"] = expires_at
         else:
             values["pellet_boiler_power_override"] = output.endswith("_on")
-            values["pellet_boiler_power_until"] = expires_at
+
         new_state = ManualControlState(**values)
         self.save(new_state)
         return new_state
@@ -118,14 +126,16 @@ class ManualControlRepository:
         state = self.load()
         values = state.to_dict()
         if output == "cwu_circulation":
+            values["cwu_circulation_active"] = False
             values["cwu_circulation_until"] = None
         elif output == "other":
+            values["other_active"] = False
             values["other_until"] = None
         elif output == "boiler_loading":
+            values["boiler_loading_active"] = False
             values["boiler_loading_until"] = None
         elif output == "pellet_boiler_power":
             values["pellet_boiler_power_override"] = None
-            values["pellet_boiler_power_until"] = None
         else:
             raise ValueError("Nieobsługiwane wyjście sterowania ręcznego")
         new_state = ManualControlState(**values)
@@ -143,8 +153,8 @@ class ManualControlRepository:
         temporary.write_text(json.dumps(state.to_dict(), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         temporary.replace(self.path)
 
-    @staticmethod
-    def _validate_timestamp(value: object) -> str | None:
+    @classmethod
+    def _validate_timestamp(cls, value: object, now: datetime) -> str | None:
         if value is None:
             return None
         if not isinstance(value, str):
@@ -152,7 +162,18 @@ class ManualControlRepository:
         parsed = datetime.fromisoformat(value)
         if parsed.tzinfo is None:
             raise ValueError("Czas wygaśnięcia musi zawierać strefę czasową")
-        return parsed.astimezone(timezone.utc).isoformat()
+        return parsed.astimezone(timezone.utc).isoformat() if parsed.astimezone(timezone.utc) > now else None
+
+    @classmethod
+    def _legacy_timestamp(cls, value: object, now: datetime) -> str | None:
+        return cls._validate_timestamp(value, now)
+
+    @classmethod
+    def _legacy_power(cls, raw: dict[str, object], now: datetime) -> bool | None:
+        override = raw.get("pellet_boiler_power_override")
+        if override is not None and not isinstance(override, bool):
+            raise ValueError("Wymuszenie zasilania pieca musi być wartością logiczną")
+        return override
 
     @staticmethod
     def _is_active(value: str | None, now: datetime) -> bool:

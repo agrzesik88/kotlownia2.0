@@ -19,7 +19,7 @@ class ManualControlPayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     output: str
-    duration_minutes: int
+    duration_minutes: int | None = None
 
 
 class AutomationSettingsPayload(BaseModel):

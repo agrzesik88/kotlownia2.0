@@ -19,8 +19,6 @@ class AutomationInput:
     pellet_level_percent: float
     pellet_heating_detected: bool
     monotonic_seconds: float
-    other_requested: bool = False
-    cwu_circulation_requested: bool = False
     boiler_loading_requested: bool = False
     pellet_boiler_power_override: bool | None = None
 
@@ -106,9 +104,7 @@ class AutomationController:
             self._boiler_loading_started_at = None
             return self._decision(
                 pellet_low=pellet_low,
-                cwu_circulation_on=inputs.cwu_circulation_requested,
                 boiler_loading_on=True,
-                other_on=inputs.other_requested,
                 reason="Pompa bojlera pracuje w trybie ręcznym",
             )
 
@@ -129,19 +125,8 @@ class AutomationController:
             self._boiler_loading_started_at = inputs.monotonic_seconds
             return self._decision(
                 pellet_low=pellet_low,
-                cwu_circulation_on=inputs.cwu_circulation_requested,
                 boiler_loading_on=True,
-                other_on=inputs.other_requested,
                 reason="Rozpoczęto czasowe ładowanie bojlera",
-            )
-
-        if inputs.other_requested:
-            self._state = BoilerState.OTHER
-            return self._decision(
-                pellet_low=pellet_low,
-                cwu_circulation_on=inputs.cwu_circulation_requested,
-                other_on=True,
-                reason="Inne pracuje na żądanie",
             )
 
         if inputs.pellet_heating_detected:
@@ -151,14 +136,12 @@ class AutomationController:
                 reason = "Piec pracuje; oczekiwanie na kolejne sprawdzenie ładowania bojlera"
             return self._decision(
                 pellet_low=pellet_low,
-                cwu_circulation_on=inputs.cwu_circulation_requested,
                 reason=reason,
             )
 
         self._state = BoilerState.IDLE
         return self._decision(
             pellet_low=pellet_low,
-            cwu_circulation_on=inputs.cwu_circulation_requested,
             reason="Sterownik gotowy — oczekiwanie w stanie IDLE",
         )
 
@@ -187,9 +170,7 @@ class AutomationController:
         if elapsed < self._boiler_loading_seconds:
             return self._decision(
                 pellet_low=pellet_low,
-                cwu_circulation_on=inputs.cwu_circulation_requested,
                 boiler_loading_on=True,
-                other_on=inputs.other_requested,
                 reason="Trwa czasowe ładowanie bojlera",
             )
 
@@ -198,29 +179,16 @@ class AutomationController:
             inputs.monotonic_seconds + self._boiler_loading_recheck_seconds
         )
 
-        # Po zakończeniu ładowania inne może wystartować w tym samym cyklu,
-        # ale nigdy równocześnie z pompą ładującą.
-        if inputs.other_requested:
-            self._state = BoilerState.OTHER
-            return self._decision(
-                pellet_low=pellet_low,
-                cwu_circulation_on=inputs.cwu_circulation_requested,
-                other_on=True,
-                reason="Ładowanie zakończone; uruchomiono inne na żądanie",
-            )
-
         if inputs.pellet_heating_detected:
             self._state = BoilerState.PELLET_HEATING
             return self._decision(
                 pellet_low=pellet_low,
-                cwu_circulation_on=inputs.cwu_circulation_requested,
                 reason="Ładowanie zakończone; następne sprawdzenie po przerwie",
             )
 
         self._state = BoilerState.IDLE
         return self._decision(
             pellet_low=pellet_low,
-            cwu_circulation_on=inputs.cwu_circulation_requested,
             reason="Ładowanie zakończone; piec pelletowy nie grzeje",
         )
 

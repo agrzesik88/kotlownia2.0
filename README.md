@@ -138,11 +138,13 @@ Informacja jest zapisywana jako zdarzenia w historii SQLite.
 
 Panel WWW pozwala ręcznie sterować:
 - cyrkulacją CWU,
-- dodatkowym wyjściem,
 - pompą ładującą bojler,
+- dodatkowym wyjściem,
 - zasilaniem pieca pelletowego.
 
-Każde żądanie ma czas wygaśnięcia. Po jego upływie sterownik automatycznie wraca do automatyki i harmonogramu.
+Dla każdego wyjścia dostępne jest trwałe sterowanie **Włącz / Wyłącz**. Po użyciu **Włącz** dane wyjście pozostaje włączone bezterminowo, niezależnie od automatyki i harmonogramu. Sterowanie ręczne pozostaje aktywne do momentu użycia **Wyłącz** dla danego wyjścia albo **Wyłącz wszystko ręcznie**.
+
+W przypadku błędu sterownika obowiązuje stan bezpieczny — ręczne wymuszenia nie omijają mechanizmu fail-safe.
 
 Plik sterowania:
 
@@ -154,7 +156,8 @@ Konfiguracja:
     enabled = true
     command_file = "runtime/manual_control.json"
 
-Panel WWW nie przełącza GPIO bezpośrednio. Wszystkie żądania przechodzą przez główny sterownik i jego automatykę.
+Panel WWW nie przełącza GPIO bezpośrednio. Wszystkie żądania przechodzą przez główny sterownik.
+
 
 ## Panel WWW
 
