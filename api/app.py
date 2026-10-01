@@ -76,6 +76,12 @@ def create_app(config_path: str | Path = "config/settings.toml") -> FastAPI:
         path = config.application.state_file.parent / "automation_settings.json"
         path.parent.mkdir(parents=True, exist_ok=True)
         data = payload.model_dump()
+        runtime_data = {
+            "boiler_loading_temperature_c": data["boiler_loading_temperature_c"],
+            "boiler_loading_seconds": data["boiler_loading_minutes"] * 60,
+            "boiler_loading_recheck_seconds": data["boiler_loading_recheck_minutes"] * 60,
+            "pellet_low_level_percent": data["pellet_low_level_percent"],
+        }
         temporary = path.with_suffix(".tmp")
         temporary.write_text(json.dumps(runtime_data, ensure_ascii=False), encoding="utf-8")
         temporary.replace(path)
