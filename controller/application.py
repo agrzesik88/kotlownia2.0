@@ -212,10 +212,10 @@ class ControllerApplication:
             self.state.automation_state = decision.state.name
             self.state.automation_reason = decision.reason
             self.state.output_status = {
-                "cwu_circulation": {"state": "OFF", "mode": "AUTO", "reason": "Sterownik w trybie awaryjnym"},
-                "boiler_loading": {"state": "OFF", "mode": "AUTO", "reason": "Sterownik w trybie awaryjnym"},
-                "electric_heater": {"state": "OFF", "mode": "AUTO", "reason": "Sterownik w trybie awaryjnym"},
-                "pellet_boiler_power": {"state": "ON", "mode": "AUTO", "reason": "Tryb awaryjny pozostawia zasilanie pieca włączone"},
+                "cwu_circulation": {"state": "OFF", "requested": "OFF", "mode": "AUTO", "reason": "Sterownik w trybie awaryjnym"},
+                "boiler_loading": {"state": "OFF", "requested": "OFF", "mode": "AUTO", "reason": "Sterownik w trybie awaryjnym"},
+                "electric_heater": {"state": "OFF", "requested": "OFF", "mode": "AUTO", "reason": "Sterownik w trybie awaryjnym"},
+                "pellet_boiler_power": {"state": "ON", "requested": "ON", "mode": "AUTO", "reason": "Tryb awaryjny pozostawia zasilanie pieca włączone"},
             }
             self.state.last_error = str(exc)
             if not self._had_error:
@@ -271,11 +271,19 @@ class ControllerApplication:
             heater_sources.append("RĘCZNY")
         if schedule.electric_heater_requested:
             heater_sources.append("HARMONOGRAM")
+        heater_requested = (
+            self.electric_heater_requested
+            or manual.electric_heater_requested
+            or schedule.electric_heater_requested
+        )
         if heater_sources:
             heater_mode = " + ".join(heater_sources)
             heater_reason = "Aktywne żądanie: " + " + ".join(heater_sources)
             if decision.boiler_loading_on and not decision.electric_heater_on:
                 heater_reason = "Żądanie zablokowane — pracuje pompa bojlera"
+        elif self.electric_heater_requested:
+            heater_mode = "AUTO"
+            heater_reason = "Aktywne żądanie sterownika"
         else:
             heater_mode = "AUTO"
             heater_reason = "Brak żądania grzania elektrycznego"
@@ -294,21 +302,25 @@ class ControllerApplication:
         self.state.output_status = {
             "cwu_circulation": {
                 "state": "ON" if decision.cwu_circulation_on else "OFF",
+                "requested": "ON" if (self.cwu_circulation_requested or manual.cwu_circulation_requested or schedule.cwu_circulation_requested) else "OFF",
                 "mode": cwu_mode,
                 "reason": cwu_reason,
             },
             "boiler_loading": {
                 "state": "ON" if decision.boiler_loading_on else "OFF",
+                "requested": "ON" if (manual.boiler_loading_requested or decision.boiler_loading_on) else "OFF",
                 "mode": boiler_mode,
                 "reason": boiler_reason,
             },
             "electric_heater": {
                 "state": "ON" if decision.electric_heater_on else "OFF",
+                "requested": "ON" if heater_requested else "OFF",
                 "mode": heater_mode,
                 "reason": heater_reason,
             },
             "pellet_boiler_power": {
                 "state": "ON" if decision.pellet_boiler_power_on else "OFF",
+                "requested": "ON" if decision.pellet_boiler_power_on else "OFF",
                 "mode": power_mode,
                 "reason": power_reason,
             },
