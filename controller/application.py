@@ -144,25 +144,24 @@ class ControllerApplication:
                 )
             )
 
-            # Ręczne sterowanie zawsze ma pierwszeństwo. Jeżeli nie ma
-            # wymuszenia ręcznego, harmonogram ma pierwszeństwo przed automatyką.
+            # Ręczne sterowanie ma zawsze pierwszeństwo.
+            # Jeżeli nie ma ręcznego wymuszenia, harmonogram ma pierwszeństwo
+            # przed automatyką. Cyrkulacja CWU i "Inne" nie są sterowane przez automatykę.
             decision = replace(
                 decision,
                 cwu_circulation_on=(
                     manual.cwu_circulation_requested
-                    if manual.cwu_circulation_active
+                    if manual.cwu_circulation_requested
                     else schedule.cwu_circulation_requested
                 ),
                 boiler_loading_on=(
                     manual.boiler_loading_requested
-                    if manual.boiler_loading_active
-                    else schedule.boiler_loading_requested
-                    if schedule.boiler_loading_requested
+                    if manual.boiler_loading_requested
                     else decision.boiler_loading_on
                 ),
                 other_on=(
                     manual.other_requested
-                    if manual.other_active
+                    if manual.other_requested
                     else schedule.other_requested
                 ),
                 pellet_boiler_power_on=(
