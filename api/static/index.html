@@ -95,14 +95,14 @@
         <div class="manual-status" id="powerManualStatus">Automatyka</div>
       </div>
       <div class="card">
-        <strong>Grzałka elektryczna</strong>
+        <strong>Inne</strong>
         <div class="button-row">
-          <button data-manual="electric_heater" data-minutes="15">15 min</button>
-          <button data-manual="electric_heater" data-minutes="30">30 min</button>
-          <button data-manual="electric_heater" data-minutes="60">60 min</button>
-          <button class="secondary" data-stop="electric_heater">Wyłącz</button>
+          <button data-manual="other" data-minutes="15">15 min</button>
+          <button data-manual="other" data-minutes="30">30 min</button>
+          <button data-manual="other" data-minutes="60">60 min</button>
+          <button class="secondary" data-stop="other">Wyłącz</button>
         </div>
-        <div class="manual-status" id="heaterManualStatus">Nieaktywne</div>
+        <div class="manual-status" id="otherManualStatus">Nieaktywne</div>
       </div>
     </div>
     <div id="manualMessage" class="muted"></div>
@@ -129,23 +129,23 @@
   <section><h2>Ostatnie zdarzenia</h2><table><thead><tr><th>Czas</th><th>Typ</th><th>Opis</th></tr></thead><tbody id="events"></tbody></table></section>
 </main>
 <script>
-const outputs=[['cwu_circulation_on','Cyrkulacja CWU'],['boiler_loading_on','Pompa bojlera'],['electric_heater_on','Grzałka'],['pellet_boiler_power_on','Zasilanie pieca']];
-const scheduleDefs=[['cwu_circulation','Cyrkulacja CWU'],['electric_heater','Grzałka elektryczna']];
+const outputs=[['cwu_circulation_on','Cyrkulacja CWU'],['boiler_loading_on','Pompa bojlera'],['other_on','Inne'],['pellet_boiler_power_on','Zasilanie pieca']];
+const scheduleDefs=[['cwu_circulation','Cyrkulacja CWU'],['other','Inne']];
 let schedule={};
 function fmt(v,s=''){return v==null?'—':Number(v).toFixed(1)+s}
 async function json(url,opts){const r=await fetch(url,opts);if(!r.ok)throw new Error(await r.text());return r.json()}
 async function refresh(){try{const [s,h,e,a]=await Promise.all([json('/api/status'),json('/api/history?limit=120'),json('/api/events?limit=20'),json('/api/automation-status')]);
  temp.textContent=fmt(s.pipe_temperature_c,'°C');pellet.textContent=fmt(s.pellet_level_percent,'%');state.textContent=s.automation_state;mode.textContent=s.simulation_mode?'SYMULACJA':'REALNY';updated.textContent='Aktualizacja: '+new Date(s.updated_at).toLocaleString();reason.textContent=s.automation_reason+(s.last_error?' — '+s.last_error:'');
- const outputNames={cwu_circulation:'Cyrkulacja CWU',boiler_loading:'Pompa bojlera',electric_heater:'Grzałka',pellet_boiler_power:'Zasilanie pieca'};
+ const outputNames={cwu_circulation:'Cyrkulacja CWU',boiler_loading:'Pompa bojlera',other:'Inne',pellet_boiler_power:'Zasilanie pieca'};
  outputsEl=document.getElementById('outputs');outputsEl.innerHTML=Object.entries(a.outputs).map(([key,o])=>`<div class="output-card"><div class="output-head"><strong>${outputNames[key]||key}</strong><span class="output-state ${o.state==='ON'?'on':''}">${o.state}</span></div><div class="output-mode">Żądanie: ${o.requested||o.state} · Tryb: ${o.mode}</div><div class="output-reason">${o.reason}</div></div>`).join('');renderManualState(s);draw(h);events.innerHTML=e.map(x=>`<tr><td>${new Date(x.occurred_at).toLocaleString()}</td><td>${x.event_type}</td><td>${x.message}</td></tr>`).join('');}catch(err){updated.textContent='Błąd połączenia: '+err.message}}
 function untilText(value){return value?'Aktywne do '+new Date(value).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}):'Nieaktywne'}
 function renderManualState(s){
  cwuManualStatus.textContent=untilText(s.cwu_manual_until);
- heaterManualStatus.textContent=untilText(s.electric_heater_manual_until);
+ otherManualStatus.textContent=untilText(s.other_manual_until);
  boilerManualStatus.textContent=untilText(s.boiler_loading_manual_until);
  powerManualStatus.textContent=s.pellet_boiler_power_manual_active?((s.pellet_boiler_power_manual_override?'Wymuszone WŁĄCZENIE do ':'Wymuszone WYŁĄCZENIE do ')+new Date(s.pellet_boiler_power_manual_until).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})):'Automatyka';
  cwuManualStatus.className='manual-status '+(s.cwu_manual_active?'on':'');
- heaterManualStatus.className='manual-status '+(s.electric_heater_manual_active?'on':'');
+ otherManualStatus.className='manual-status '+(s.other_manual_active?'on':'');
  boilerManualStatus.className='manual-status '+(s.boiler_loading_manual_active?'on':'');
  powerManualStatus.className='manual-status '+(s.pellet_boiler_power_manual_active?(s.pellet_boiler_power_manual_override?'on':'error'):'');
 }
