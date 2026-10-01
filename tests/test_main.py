@@ -26,6 +26,7 @@ def test_one_simulation_cycle_writes_state(tmp_path: Path) -> None:
 
 def test_run_stops_after_requested_cycle(tmp_path: Path) -> None:
     config = load_config()
+    object.__setattr__(config.application, "simulation", True)
     object.__setattr__(config.application, "state_file", tmp_path / "state.json")
     object.__setattr__(config.history, "database_file", tmp_path / "history.db")
     object.__setattr__(config.history, "sample_interval_seconds", 0.0)
@@ -58,6 +59,7 @@ def test_simulation_cycle_writes_sqlite_history(tmp_path: Path) -> None:
     from controller.history import HistoryRepository
 
     config = load_config()
+    object.__setattr__(config.application, "simulation", True)
     object.__setattr__(config.application, "state_file", tmp_path / "state.json")
     object.__setattr__(config.history, "database_file", tmp_path / "history.db")
     object.__setattr__(config.history, "sample_interval_seconds", 0.0)
