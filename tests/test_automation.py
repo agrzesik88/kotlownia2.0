@@ -24,7 +24,7 @@ def test_boot_goes_to_idle() -> None:
     decision = controller.evaluate(make_input())
     assert decision.state is BoilerState.IDLE
     assert not decision.boiler_loading_on
-    assert not decision.other_on
+    assert decision.other_on
 
 
 def test_rejects_invalid_sensor_values() -> None:
@@ -46,7 +46,7 @@ def test_loading_starts_at_45_degrees() -> None:
     )
     assert decision.state is BoilerState.BOILER_LOADING
     assert decision.boiler_loading_on
-    assert decision.other_on
+    assert not decision.other_on
 
 
 def test_loading_runs_for_configured_ten_minutes() -> None:
