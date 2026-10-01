@@ -21,10 +21,13 @@ echo_gpio = 24
 empty_distance_cm = 57.0
 full_distance_cm = 8.9
 
-sample_count = 5
-minimum_valid_samples = 3
+# Więcej próbek + odrzucanie skrajnych wartości stabilizuje HC-SR04.
+sample_count = 7
+minimum_valid_samples = 5
 max_consecutive_failures = 5
 sample_interval_seconds = 0.05
+# Zmiana poziomu mniejsza lub równa tej wartości jest ignorowana.
+level_tolerance_percent = 0.5
 
 simulation_level_percent = 75.0
 

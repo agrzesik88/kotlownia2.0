@@ -34,6 +34,7 @@ class PelletConfig:
     minimum_valid_samples: int
     max_consecutive_failures: int
     sample_interval_seconds: float
+    level_tolerance_percent: float
     simulation_level_percent: float
 
 
@@ -154,6 +155,9 @@ def load_config(path: str | Path = "config/settings.toml") -> ControllerConfig:
             ),
             sample_interval_seconds=float(
                 pellet.get("sample_interval_seconds", 0.05)
+            ),
+            level_tolerance_percent=float(
+                pellet.get("level_tolerance_percent", 0.5)
             ),
             simulation_level_percent=float(
                 pellet.get("simulation_level_percent", 75.0)
