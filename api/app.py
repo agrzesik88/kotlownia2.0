@@ -33,7 +33,7 @@ class AutomationSettingsPayload(BaseModel):
 class SchedulePayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    timezone: str
+    timezone: str = "Europe/Warsaw"
     cwu_circulation: dict[str, Any]
     other: dict[str, Any]
 
