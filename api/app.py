@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import sqlite3
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
@@ -118,6 +119,10 @@ def create_app(config_path: str | Path = "config/settings.toml") -> FastAPI:
         app.state.schedule_repository.save(schedule)
         return schedule.to_dict()
 
+
+    @app.get("/api/schedule-status")
+    def schedule_status() -> dict[str, Any]:
+        return _read_cwu_schedule_status(config)
 
     @app.get("/api/manual")
     def get_manual() -> dict[str, Any]:
@@ -243,3 +248,58 @@ def _read_events(config: ControllerConfig, limit: int) -> list[dict[str, Any]]:
         result.append(item)
     return result
 
+
+
+def _read_cwu_schedule_status(config: ControllerConfig) -> dict[str, Any]:
+    if not config.history.database_file.exists():
+        return {"cwu_circulation_last_started_at": None, "cwu_circulation_last_duration_seconds": None}
+
+    with sqlite3.connect(config.history.database_file, timeout=2.0) as db:
+        start = db.execute(
+            "SELECT occurred_at FROM events WHERE event_type = ? ORDER BY id DESC LIMIT 1",
+            ("CWU_CIRCULATION_SCHEDULE_STARTED",),
+        ).fetchone()
+        stop = db.execute(
+            "SELECT occurred_at, payload_json FROM events WHERE event_type = ? ORDER BY id DESC LIMIT 1",
+            ("CWU_CIRCULATION_SCHEDULE_STOPPED",),
+        ).fetchone()
+
+    if start is None:
+        return {"cwu_circulation_last_started_at": None, "cwu_circulation_last_duration_seconds": None}
+
+    started_at = str(start[0])
+    duration_seconds: float | None = None
+
+    if stop is not None and str(stop[0]) >= started_at:
+        try:
+            payload = json.loads(str(stop[1]))
+            duration_seconds = float(payload["duration_seconds"])
+        except (KeyError, TypeError, ValueError, json.JSONDecodeError):
+            duration_seconds = None
+    else:
+        state = _read_state(config)
+        output = state.get("output_status", {}).get("cwu_circulation", {})
+        if output.get("state") == "ON" and "HARMONOGRAM" in str(output.get("mode", "")):
+            try:
+                duration_seconds = max(
+                    0.0,
+                    (datetime.now(timezone.utc) - datetime.fromisoformat(started_at)).total_seconds(),
+                )
+            except ValueError:
+                duration_seconds = None
+
+    return {
+        "cwu_circulation_last_started_at": started_at,
+        "cwu_circulation_last_duration_seconds": duration_seconds,
+    }
+
+
+def _read_latest_event_time(config: ControllerConfig, event_type: str) -> str | None:
+    if not config.history.database_file.exists():
+        return None
+    with sqlite3.connect(config.history.database_file, timeout=2.0) as db:
+        row = db.execute(
+            "SELECT occurred_at FROM events WHERE event_type = ? ORDER BY id DESC LIMIT 1",
+            (event_type,),
+        ).fetchone()
+    return str(row[0]) if row is not None else None

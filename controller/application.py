@@ -38,6 +38,9 @@ class ControllerApplication:
         self._pellet_was_low = False
         self._had_error = False
         self._last_history_recorded_at: float | None = None
+        self._last_cwu_circulation_on: bool | None = None
+        self._cwu_schedule_started_at: float | None = None
+        self._last_cwu_schedule_active = False
         self._automation_settings_path = (
             config.application.state_file.parent / "automation_settings.json"
         )
@@ -148,6 +151,11 @@ class ControllerApplication:
                 other_on=decision.other_on,
                 pellet_boiler_power_on=decision.pellet_boiler_power_on,
             )
+            self._record_cwu_schedule_transition(
+                decision.cwu_circulation_on,
+                schedule.cwu_circulation_requested,
+                now,
+            )
 
             self.state.pipe_temperature_c = temperature
             self.state.pellet_level_percent = pellet_level
@@ -180,6 +188,22 @@ class ControllerApplication:
                 other_on=decision.other_on,
                 pellet_boiler_power_on=decision.pellet_boiler_power_on,
             )
+            if self._last_cwu_circulation_on is True and self._cwu_schedule_started_at is not None:
+                duration_seconds = max(0.0, now - self._cwu_schedule_started_at)
+                self.event_bus.publish(
+                    ControllerEvent(
+                        EventType.CWU_CIRCULATION_SCHEDULE_STOPPED,
+                        "Cyrkulacja CWU została wyłączona w trybie awaryjnym",
+                        {
+                            "output": "cwu_circulation",
+                            "source": "HARMONOGRAM",
+                            "duration_seconds": round(duration_seconds, 1),
+                        },
+                    )
+                )
+            self._last_cwu_circulation_on = False
+            self._cwu_schedule_started_at = None
+            self._last_cwu_schedule_active = False
             self.state.automation_state = decision.state.name
             self.state.automation_reason = decision.reason
             self.state.output_status = {
@@ -194,8 +218,6 @@ class ControllerApplication:
                 self.event_bus.publish(ControllerEvent(EventType.CONTROLLER_ERROR, f"Błąd sterownika: {exc}", {"error": str(exc)}))
             self._had_error = True
         finally:
-            self.state.temperature_sensor_consecutive_failures = self.temperature.consecutive_failures
-            self.state.temperature_sensor_stale = self.temperature.using_last_good_value
             self.state.pellet_sensor_consecutive_failures = self.pellet.consecutive_failures
             self.state.pellet_sensor_stale = self.pellet.using_last_good_value
             self._update_alerts()
@@ -204,6 +226,39 @@ class ControllerApplication:
             self.state.save(self.config.application.state_file)
             self._record_history_if_due(now)
         return self.state
+
+    def _record_cwu_schedule_transition(
+        self,
+        cwu_circulation_on: bool,
+        schedule_active: bool,
+        now: float,
+    ) -> None:
+        previous = self._last_cwu_circulation_on
+        if cwu_circulation_on and schedule_active and previous is not True:
+            self._cwu_schedule_started_at = now
+            self.event_bus.publish(
+                ControllerEvent(
+                    EventType.CWU_CIRCULATION_SCHEDULE_STARTED,
+                    "Cyrkulacja CWU została włączona przez harmonogram",
+                    {"output": "cwu_circulation", "source": "HARMONOGRAM"},
+                )
+            )
+        elif self._last_cwu_schedule_active and not schedule_active and self._cwu_schedule_started_at is not None:
+            duration_seconds = max(0.0, now - self._cwu_schedule_started_at)
+            self.event_bus.publish(
+                ControllerEvent(
+                    EventType.CWU_CIRCULATION_SCHEDULE_STOPPED,
+                    "Cyrkulacja CWU została wyłączona po zakończeniu harmonogramu",
+                    {
+                        "output": "cwu_circulation",
+                        "source": "HARMONOGRAM",
+                        "duration_seconds": round(duration_seconds, 1),
+                    },
+                )
+            )
+            self._cwu_schedule_started_at = None
+        self._last_cwu_circulation_on = cwu_circulation_on
+        self._last_cwu_schedule_active = schedule_active
 
     def _update_output_status(self, decision: AutomationDecision, schedule: ScheduleDecision, manual: ManualControlDecision) -> None:
         cwu_sources = []
@@ -280,8 +335,6 @@ class ControllerApplication:
         alerts: list[dict[str, str]] = []
         if self.state.pellet_low:
             alerts.append({"severity": "WARNING", "code": "PELLET_LOW", "message": f"Niski poziom pelletu: {self.state.pellet_level_percent:.1f}%"})
-        if self.state.temperature_sensor_stale:
-            alerts.append({"severity": "WARNING", "code": "TEMPERATURE_SENSOR_STALE", "message": "DS18B20 nie dostarczył poprawnego pomiaru. Używany jest ostatni poprawny odczyt " f"({self.state.temperature_sensor_consecutive_failures} błędów)."})
         if self.state.pellet_sensor_stale:
             alerts.append({"severity": "WARNING", "code": "PELLET_SENSOR_STALE", "message": "HC-SR04 nie dostarcza poprawnych pomiarów. Używany jest ostatni poprawny odczyt " f"({self.state.pellet_sensor_consecutive_failures} błędów)."})
         if self.state.last_error:
@@ -340,8 +393,6 @@ class ControllerApplication:
         self.notifications.info(f"{self.config.application.name} uruchomiona; symulacja={self.config.application.simulation}")
         while not self.stop_event.is_set():
             state = self.run_once()
-            if state.temperature_sensor_stale:
-                logging.warning("DS18B20: używam ostatniego poprawnego pomiaru; kolejne błędy=%s", state.temperature_sensor_consecutive_failures)
             if state.pellet_sensor_stale:
                 logging.warning("HC-SR04: używam ostatniego poprawnego pomiaru; kolejne błędy=%s", state.pellet_sensor_consecutive_failures)
             logging.info("Temperatura=%s°C, pellet=%s%%, automat=%s, powód=%s", state.pipe_temperature_c, state.pellet_level_percent, state.automation_state, state.automation_reason)

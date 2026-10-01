@@ -19,6 +19,7 @@ class TimeWindow:
     weekdays: tuple[str, ...] = WEEKDAYS
     duration_minutes: int = 10
     repeat_minutes: int = 60
+    enabled: bool = True
 
     def __post_init__(self) -> None:
         start = _parse_time(self.start)
@@ -42,6 +43,8 @@ class TimeWindow:
             )
 
     def matches(self, local_datetime: datetime) -> bool:
+        if not self.enabled:
+            return False
         day = WEEKDAYS[local_datetime.weekday()]
         current = local_datetime.timetz().replace(tzinfo=None)
         start = _parse_time(self.start)
@@ -160,6 +163,7 @@ def schedule_from_dict(raw: dict[str, Any]) -> ScheduleConfig:
         windows_raw = value.get("windows", [])
         if not isinstance(windows_raw, list):
             raise ValueError(f"{name}.windows musi być listą")
+        section_enabled = bool(value.get("enabled", False))
         windows: list[TimeWindow] = []
         for item in windows_raw:
             if not isinstance(item, dict):
@@ -174,10 +178,11 @@ def schedule_from_dict(raw: dict[str, Any]) -> ScheduleConfig:
                     weekdays=tuple(str(day) for day in weekdays_raw),
                     duration_minutes=int(item.get("duration_minutes", 10)),
                     repeat_minutes=int(item.get("repeat_minutes", 60)),
+                    enabled=bool(item.get("enabled", section_enabled)),
                 )
             )
         return OutputSchedule(
-            enabled=bool(value.get("enabled", False)),
+            enabled=any(window.enabled for window in windows),
             windows=tuple(windows),
         )
 

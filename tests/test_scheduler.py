@@ -91,3 +91,15 @@ def test_duration_cannot_exceed_range() -> None:
         assert "dłuższy niż zakres" in str(exc)
     else:
         raise AssertionError("Czas trwania nie może przekraczać zakresu")
+
+
+
+def test_disabled_schedule_window_does_not_match() -> None:
+    window = TimeWindow("06:00", "07:00", ("mon",), enabled=False)
+    assert not window.matches(dt("2026-07-20T06:05"))
+
+
+def test_window_enabled_flag_works_without_section_enabled() -> None:
+    from controller.scheduler import schedule_from_dict
+    config = schedule_from_dict({"cwu_circulation": {"enabled": False, "windows": [{"start": "06:00", "end": "07:00", "weekdays": ["mon"], "enabled": True}]}})
+    assert config.cwu_circulation.active_at(dt("2026-07-20T06:05"))

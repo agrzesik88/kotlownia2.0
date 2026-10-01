@@ -19,7 +19,6 @@ class TemperatureConfig:
     simulation: bool
     heating_available_c: float
     read_interval_seconds: float
-    max_consecutive_failures: int
     sensor_file: Path | None
     simulation_value_c: float
 
@@ -146,7 +145,6 @@ def load_config(path: str | Path = "config/settings.toml") -> ControllerConfig:
             simulation=bool(temperature.get("simulation", application["simulation"])),
             heating_available_c=float(temperature["heating_available_c"]),
             read_interval_seconds=float(temperature["read_interval_seconds"]),
-            max_consecutive_failures=int(temperature.get("max_consecutive_failures", 5)),
             sensor_file=sensor_file,
             simulation_value_c=float(temperature.get("simulation_value_c", 20.0)),
         ),
