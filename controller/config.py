@@ -84,7 +84,7 @@ class EmailNotificationConfig:
     username_env: str
     password_env: str
     sender: str
-    recipient: str
+    recipients: tuple[str, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -128,6 +128,12 @@ def load_config(path: str | Path = "config/settings.toml") -> ControllerConfig:
     sensor_file_value = temperature.get("sensor_file")
     sensor_file = Path(str(sensor_file_value)) if sensor_file_value else None
 
+    recipients = email_notifications.get("recipients", [])
+    if isinstance(recipients, str):
+        recipients = [recipients]
+    if not isinstance(recipients, list) or not all(isinstance(item, str) for item in recipients):
+        raise ValueError("[email_notifications].recipients musi być listą adresów e-mail")
+
     return ControllerConfig(
         application=ApplicationConfig(
             name=str(application["name"]),
@@ -150,18 +156,10 @@ def load_config(path: str | Path = "config/settings.toml") -> ControllerConfig:
             full_distance_cm=float(pellet.get("full_distance_cm", 10.0)),
             sample_count=int(pellet.get("sample_count", 5)),
             minimum_valid_samples=int(pellet.get("minimum_valid_samples", 3)),
-            max_consecutive_failures=int(
-                pellet.get("max_consecutive_failures", 5)
-            ),
-            sample_interval_seconds=float(
-                pellet.get("sample_interval_seconds", 0.05)
-            ),
-            level_tolerance_percent=float(
-                pellet.get("level_tolerance_percent", 0.5)
-            ),
-            simulation_level_percent=float(
-                pellet.get("simulation_level_percent", 75.0)
-            ),
+            max_consecutive_failures=int(pellet.get("max_consecutive_failures", 5)),
+            sample_interval_seconds=float(pellet.get("sample_interval_seconds", 0.05)),
+            level_tolerance_percent=float(pellet.get("level_tolerance_percent", 0.5)),
+            simulation_level_percent=float(pellet.get("simulation_level_percent", 75.0)),
         ),
         relays=RelayConfig(
             active_low=bool(relays["active_low"]),
@@ -171,17 +169,11 @@ def load_config(path: str | Path = "config/settings.toml") -> ControllerConfig:
             pellet_boiler_power_gpio=int(relays["pellet_boiler_power_gpio"]),
         ),
         automation=AutomationConfig(
-            boiler_loading_temperature_c=float(
-                automation["boiler_loading_temperature_c"]
-            ),
+            boiler_loading_temperature_c=float(automation["boiler_loading_temperature_c"]),
             boiler_loading_seconds=int(automation["boiler_loading_seconds"]),
-            boiler_loading_recheck_seconds=int(
-                automation["boiler_loading_recheck_seconds"]
-            ),
+            boiler_loading_recheck_seconds=int(automation["boiler_loading_recheck_seconds"]),
             pellet_low_level_percent=float(automation["pellet_low_level_percent"]),
-            pellet_low_reminder_seconds=int(
-                automation.get("pellet_low_reminder_seconds", 86400)
-            ),
+            pellet_low_reminder_seconds=int(automation.get("pellet_low_reminder_seconds", 86400)),
         ),
         scheduler=SchedulerConfig(
             enabled=bool(scheduler.get("enabled", True)),
@@ -189,9 +181,7 @@ def load_config(path: str | Path = "config/settings.toml") -> ControllerConfig:
         ),
         manual_control=ManualControlConfig(
             enabled=bool(manual_control.get("enabled", True)),
-            command_file=Path(
-                str(manual_control.get("command_file", "runtime/manual_control.json"))
-            ),
+            command_file=Path(str(manual_control.get("command_file", "runtime/manual_control.json"))),
         ),
         history=HistoryConfig(
             enabled=bool(history.get("enabled", True)),
@@ -203,13 +193,9 @@ def load_config(path: str | Path = "config/settings.toml") -> ControllerConfig:
             smtp_host=str(email_notifications.get("smtp_host", "")),
             smtp_port=int(email_notifications.get("smtp_port", 587)),
             use_starttls=bool(email_notifications.get("use_starttls", True)),
-            username_env=str(
-                email_notifications.get("username_env", "KOTLOWNIA_SMTP_USERNAME")
-            ),
-            password_env=str(
-                email_notifications.get("password_env", "KOTLOWNIA_SMTP_PASSWORD")
-            ),
+            username_env=str(email_notifications.get("username_env", "KOTLOWNIA_SMTP_USERNAME")),
+            password_env=str(email_notifications.get("password_env", "KOTLOWNIA_SMTP_PASSWORD")),
             sender=str(email_notifications.get("sender", "")),
-            recipient=str(email_notifications.get("recipient", "")),
+            recipients=tuple(str(item) for item in recipients),
         ),
     )

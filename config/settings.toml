@@ -16,19 +16,13 @@ sensor_file = "/sys/bus/w1/devices/28-3ce1d4438132/w1_slave"
 simulation = false
 trigger_gpio = 23
 echo_gpio = 24
-
-# Wartości kalibracyjne zbiornika — ustawimy je przed testem sprzętowym.
 empty_distance_cm = 57.0
 full_distance_cm = 8.9
-
-# Więcej próbek + odrzucanie skrajnych wartości stabilizuje HC-SR04.
 sample_count = 7
 minimum_valid_samples = 5
 max_consecutive_failures = 5
 sample_interval_seconds = 0.05
-# Zmiana poziomu mniejsza lub równa tej wartości jest ignorowana.
 level_tolerance_percent = 0.5
-
 simulation_level_percent = 75.0
 
 [relays]
@@ -43,7 +37,7 @@ boiler_loading_temperature_c = 45.0
 boiler_loading_seconds = 600
 boiler_loading_recheck_seconds = 3600
 pellet_low_level_percent = 15.0
-pellet_low_reminder_seconds = 86400
+pellet_low_reminder_seconds = 7200
 
 [scheduler]
 enabled = true
@@ -59,11 +53,14 @@ database_file = "runtime/history.db"
 sample_interval_seconds = 10.0
 
 [email_notifications]
-enabled = false
-smtp_host = "smtp.example.com"
+enabled = true
+smtp_host = "smtp.gmail.com"
 smtp_port = 587
 use_starttls = true
 username_env = "KOTLOWNIA_SMTP_USERNAME"
 password_env = "KOTLOWNIA_SMTP_PASSWORD"
-sender = "kotlownia@example.com"
-recipient = "adres@example.com"
+sender = "raspberrypieddy88@gmail.com"
+recipients = [
+    "aeddy88@gmail.com",
+    "elwira.grzesik83@gmail.com",
+]

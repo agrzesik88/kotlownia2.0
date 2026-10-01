@@ -52,7 +52,7 @@ class ControllerApplication:
                 username_env=email.username_env,
                 password_env=email.password_env,
                 sender=email.sender,
-                recipient=email.recipient,
+                recipients=email.recipients,
             )
         )
 
@@ -65,21 +65,13 @@ class ControllerApplication:
             self.history = None
         self.event_bus.subscribe(self._handle_event)
 
-        # Czujniki są inicjalizowane przed przekaźnikami. Brak zależności
-        # sprzętowej nie może spowodować nawet chwilowego przełączenia wyjść.
-        self.temperature = TemperatureSensor(
-            config.temperature, config.temperature.simulation
-        )
+        self.temperature = TemperatureSensor(config.temperature, config.temperature.simulation)
         self.pellet = PelletSensor(config.pellet, config.pellet.simulation)
         self.relays = RelayController(config.relays, config.application.simulation)
         self.automation = AutomationController(
-            boiler_loading_temperature_c=(
-                config.automation.boiler_loading_temperature_c
-            ),
+            boiler_loading_temperature_c=config.automation.boiler_loading_temperature_c,
             boiler_loading_seconds=config.automation.boiler_loading_seconds,
-            boiler_loading_recheck_seconds=(
-                config.automation.boiler_loading_recheck_seconds
-            ),
+            boiler_loading_recheck_seconds=config.automation.boiler_loading_recheck_seconds,
             pellet_low_level_percent=config.automation.pellet_low_level_percent,
         )
         self.manual_control = (
@@ -105,9 +97,7 @@ class ControllerApplication:
         import json
 
         try:
-            raw = json.loads(
-                self._automation_settings_path.read_text(encoding="utf-8")
-            )
+            raw = json.loads(self._automation_settings_path.read_text(encoding="utf-8"))
             if not isinstance(raw, dict):
                 return
             self.automation.update_settings(
@@ -123,7 +113,6 @@ class ControllerApplication:
         self.stop_event.set()
 
     def set_other_requested(self, requested: bool) -> None:
-        """Ręczne żądanie używane przez przyszłe API/tryb serwisowy."""
         self.other_requested = requested
 
     def set_cwu_circulation_requested(self, requested: bool) -> None:
@@ -135,29 +124,11 @@ class ControllerApplication:
             self._load_runtime_automation_settings()
             temperature = self.temperature.read_celsius()
             pellet_level = self.pellet.read_level_percent()
-            heating_detected = (
-                temperature >= self.config.temperature.heating_available_c
-            )
-            schedule = (
-                self.scheduler.evaluate()
-                if self.scheduler is not None
-                else ScheduleDecision(False, False)
-            )
-            manual = (
-                self.manual_control.evaluate()
-                if self.manual_control is not None
-                else ManualControlDecision()
-            )
-            other_requested = (
-                self.other_requested
-                or schedule.other_requested
-                or manual.other_requested
-            )
-            cwu_circulation_requested = (
-                self.cwu_circulation_requested
-                or schedule.cwu_circulation_requested
-                or manual.cwu_circulation_requested
-            )
+            heating_detected = temperature >= self.config.temperature.heating_available_c
+            schedule = self.scheduler.evaluate() if self.scheduler is not None else ScheduleDecision(False, False)
+            manual = self.manual_control.evaluate() if self.manual_control is not None else ManualControlDecision()
+            other_requested = self.other_requested or schedule.other_requested or manual.other_requested
+            cwu_circulation_requested = self.cwu_circulation_requested or schedule.cwu_circulation_requested or manual.cwu_circulation_requested
 
             decision = self.automation.evaluate(
                 AutomationInput(
@@ -191,7 +162,7 @@ class ControllerApplication:
             self.state.cwu_manual_active = manual.cwu_circulation_requested
             self.state.other_manual_active = manual.other_requested
             self.state.boiler_loading_manual_active = manual.boiler_loading_requested
-            self.state.pellet_boiler_power_manual_active = (manual.pellet_boiler_power_override is not None)
+            self.state.pellet_boiler_power_manual_active = manual.pellet_boiler_power_override is not None
             self.state.pellet_boiler_power_manual_override = manual.pellet_boiler_power_override
             self.state.cwu_manual_until = manual.cwu_circulation_until
             self.state.other_manual_until = manual.other_until
@@ -218,26 +189,12 @@ class ControllerApplication:
                 "pellet_boiler_power": {"state": "ON", "requested": "ON", "mode": "AUTO", "reason": "Tryb awaryjny pozostawia zasilanie pieca włączone"},
             }
             self.state.last_error = str(exc)
-            self.state.alerts = [
-                {
-                    "severity": "ERROR",
-                    "code": "CONTROLLER_ERROR",
-                    "message": f"Błąd sterownika: {exc}",
-                }
-            ]
+            self.state.alerts = [{"severity": "ERROR", "code": "CONTROLLER_ERROR", "message": f"Błąd sterownika: {exc}"}]
             if not self._had_error:
-                self.event_bus.publish(
-                    ControllerEvent(
-                        EventType.CONTROLLER_ERROR,
-                        f"Błąd sterownika: {exc}",
-                        {"error": str(exc)},
-                    )
-                )
+                self.event_bus.publish(ControllerEvent(EventType.CONTROLLER_ERROR, f"Błąd sterownika: {exc}", {"error": str(exc)}))
             self._had_error = True
         finally:
-            self.state.pellet_sensor_consecutive_failures = (
-                self.pellet.consecutive_failures
-            )
+            self.state.pellet_sensor_consecutive_failures = self.pellet.consecutive_failures
             self.state.pellet_sensor_stale = self.pellet.using_last_good_value
             self._update_alerts()
             self._copy_relay_state()
@@ -246,23 +203,14 @@ class ControllerApplication:
             self._record_history_if_due(now)
         return self.state
 
-    def _update_output_status(
-        self,
-        decision: AutomationDecision,
-        schedule: ScheduleDecision,
-        manual: ManualControlDecision,
-    ) -> None:
+    def _update_output_status(self, decision: AutomationDecision, schedule: ScheduleDecision, manual: ManualControlDecision) -> None:
         cwu_sources = []
         if manual.cwu_circulation_requested:
             cwu_sources.append("RĘCZNY")
         if schedule.cwu_circulation_requested:
             cwu_sources.append("HARMONOGRAM")
         cwu_mode = " + ".join(cwu_sources) if cwu_sources else "AUTO"
-        cwu_reason = (
-            "Aktywne żądanie: " + " + ".join(cwu_sources)
-            if cwu_sources
-            else "Brak żądania cyrkulacji"
-        )
+        cwu_reason = "Aktywne żądanie: " + " + ".join(cwu_sources) if cwu_sources else "Brak żądania cyrkulacji"
 
         if manual.boiler_loading_requested:
             boiler_mode = "RĘCZNY"
@@ -279,11 +227,7 @@ class ControllerApplication:
             other_sources.append("RĘCZNY")
         if schedule.other_requested:
             other_sources.append("HARMONOGRAM")
-        other_requested = (
-            self.other_requested
-            or manual.other_requested
-            or schedule.other_requested
-        )
+        other_requested = self.other_requested or manual.other_requested or schedule.other_requested
         if other_sources:
             other_mode = " + ".join(other_sources)
             other_reason = "Aktywne żądanie: " + " + ".join(other_sources)
@@ -298,11 +242,7 @@ class ControllerApplication:
 
         if manual.pellet_boiler_power_override is not None:
             power_mode = "RĘCZNY"
-            power_reason = (
-                "Wymuszone włączenie ręczne"
-                if manual.pellet_boiler_power_override
-                else "Wymuszone wyłączenie ręczne"
-            )
+            power_reason = "Wymuszone włączenie ręczne" if manual.pellet_boiler_power_override else "Wymuszone wyłączenie ręczne"
         else:
             power_mode = "AUTO"
             power_reason = "Zasilanie sterowane automatycznie"
@@ -336,113 +276,44 @@ class ControllerApplication:
 
     def _update_alerts(self) -> None:
         alerts: list[dict[str, str]] = []
-
         if self.state.pellet_low:
-            alerts.append(
-                {
-                    "severity": "WARNING",
-                    "code": "PELLET_LOW",
-                    "message": (
-                        "Niski poziom pelletu: "
-                        f"{self.state.pellet_level_percent:.1f}%"
-                    ),
-                }
-            )
-
+            alerts.append({"severity": "WARNING", "code": "PELLET_LOW", "message": f"Niski poziom pelletu: {self.state.pellet_level_percent:.1f}%"})
         if self.state.pellet_sensor_stale:
-            alerts.append(
-                {
-                    "severity": "WARNING",
-                    "code": "PELLET_SENSOR_STALE",
-                    "message": (
-                        "HC-SR04 nie dostarcza poprawnych pomiarów. "
-                        "Używany jest ostatni poprawny odczyt "
-                        f"({self.state.pellet_sensor_consecutive_failures} błędów)."
-                    ),
-                }
-            )
-
+            alerts.append({"severity": "WARNING", "code": "PELLET_SENSOR_STALE", "message": "HC-SR04 nie dostarcza poprawnych pomiarów. Używany jest ostatni poprawny odczyt " f"({self.state.pellet_sensor_consecutive_failures} błędów)."})
         if self.state.last_error:
-            alerts.append(
-                {
-                    "severity": "ERROR",
-                    "code": "CONTROLLER_ERROR",
-                    "message": f"Błąd sterownika: {self.state.last_error}",
-                }
-            )
-
+            alerts.append({"severity": "ERROR", "code": "CONTROLLER_ERROR", "message": f"Błąd sterownika: {self.state.last_error}"})
         self.state.alerts = alerts
 
     def _publish_recovery_if_needed(self) -> None:
         if not self._had_error:
             return
         self._had_error = False
-        self.event_bus.publish(
-            ControllerEvent(
-                EventType.CONTROLLER_RECOVERED,
-                "Sterownik wrócił do prawidłowej pracy",
-            )
-        )
+        self.event_bus.publish(ControllerEvent(EventType.CONTROLLER_RECOVERED, "Sterownik wrócił do prawidłowej pracy"))
 
-    def _update_pellet_events(
-        self,
-        now: float,
-        pellet_level_percent: float,
-        pellet_low: bool,
-    ) -> None:
+    def _update_pellet_events(self, now: float, pellet_level_percent: float, pellet_low: bool) -> None:
         if not pellet_low:
             if self._pellet_was_low:
-                self.event_bus.publish(
-                    ControllerEvent(
-                        EventType.PELLET_RECOVERED,
-                        "Poziom pelletu wrócił powyżej progu alarmowego",
-                        {"pellet_level_percent": pellet_level_percent},
-                    )
-                )
+                self.event_bus.publish(ControllerEvent(EventType.PELLET_RECOVERED, "Poziom pelletu wrócił powyżej progu alarmowego", {"pellet_level_percent": pellet_level_percent}))
             self._pellet_was_low = False
             self._last_pellet_notification_at = None
             return
-
         if not self._pellet_was_low:
-            self.event_bus.publish(
-                ControllerEvent(
-                    EventType.PELLET_LOW,
-                    f"Niski poziom pelletu: {pellet_level_percent:.1f}%",
-                    {"pellet_level_percent": pellet_level_percent},
-                )
-            )
+            self.event_bus.publish(ControllerEvent(EventType.PELLET_LOW, f"Niski poziom pelletu: {pellet_level_percent:.1f}%", {"pellet_level_percent": pellet_level_percent}))
             self._last_pellet_notification_at = now
-        elif (
-            self._last_pellet_notification_at is None
-            or now - self._last_pellet_notification_at
-            >= self.config.automation.pellet_low_reminder_seconds
-        ):
-            self.notifications.send_email(
-                "Kotłownia 2.0: nadal niski poziom pelletu",
-                (
-                    "Poziom pelletu nadal wynosi tylko "
-                    f"{pellet_level_percent:.1f}%. Uzupełnij zasobnik."
-                ),
-            )
+        elif self._last_pellet_notification_at is None or now - self._last_pellet_notification_at >= self.config.automation.pellet_low_reminder_seconds:
+            self.notifications.send_email("Kotłownia 2.0: nadal niski poziom pelletu", f"Poziom pelletu nadal wynosi tylko {pellet_level_percent:.1f}%. Uzupełnij zasobnik.")
             self._last_pellet_notification_at = now
         self._pellet_was_low = True
 
     def _handle_event(self, event: ControllerEvent) -> None:
         if self.history is not None:
             self.history.record_event(event)
-
         if event.event_type is EventType.PELLET_LOW:
             self.notifications.warning(event.message)
-            self.notifications.send_email(
-                "Kotłownia 2.0: niski poziom pelletu",
-                event.message + ". Uzupełnij zasobnik.",
-            )
+            self.notifications.send_email("Kotłownia 2.0: niski poziom pelletu", event.message + ". Uzupełnij zasobnik.")
         elif event.event_type is EventType.CONTROLLER_ERROR:
             self.notifications.error(event.message)
-            self.notifications.send_email(
-                "Kotłownia 2.0: błąd sterownika",
-                event.message,
-            )
+            self.notifications.send_email("Kotłownia 2.0: błąd sterownika", event.message)
         else:
             self.notifications.info(event.message)
 
@@ -450,14 +321,7 @@ class ControllerApplication:
         if self.history is None:
             return
         interval = self.config.history.sample_interval_seconds
-        if interval <= 0:
-            self.history.record_state(self.state)
-            self._last_history_recorded_at = now
-            return
-        if (
-            self._last_history_recorded_at is None
-            or now - self._last_history_recorded_at >= interval
-        ):
+        if interval <= 0 or self._last_history_recorded_at is None or now - self._last_history_recorded_at >= interval:
             self.history.record_state(self.state)
             self._last_history_recorded_at = now
 
@@ -469,25 +333,12 @@ class ControllerApplication:
         self.state.pellet_boiler_power_on = relay_state.pellet_boiler_power_on
 
     def run(self) -> None:
-        self.notifications.info(
-            f"{self.config.application.name} uruchomiona; "
-            f"symulacja={self.config.application.simulation}"
-        )
+        self.notifications.info(f"{self.config.application.name} uruchomiona; symulacja={self.config.application.simulation}")
         while not self.stop_event.is_set():
             state = self.run_once()
             if state.pellet_sensor_stale:
-                logging.warning(
-                    "HC-SR04: używam ostatniego poprawnego pomiaru; "
-                    "kolejne błędy=%s",
-                    state.pellet_sensor_consecutive_failures,
-                )
-            logging.info(
-                "Temperatura=%s°C, pellet=%s%%, automat=%s, powód=%s",
-                state.pipe_temperature_c,
-                state.pellet_level_percent,
-                state.automation_state,
-                state.automation_reason,
-            )
+                logging.warning("HC-SR04: używam ostatniego poprawnego pomiaru; kolejne błędy=%s", state.pellet_sensor_consecutive_failures)
+            logging.info("Temperatura=%s°C, pellet=%s%%, automat=%s, powód=%s", state.pipe_temperature_c, state.pellet_level_percent, state.automation_state, state.automation_reason)
             self.stop_event.wait(self.config.application.loop_interval_seconds)
 
     def close(self) -> None:
