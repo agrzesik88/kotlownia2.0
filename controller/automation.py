@@ -9,7 +9,7 @@ class BoilerState(Enum):
     IDLE = auto()
     PELLET_HEATING = auto()
     BOILER_LOADING = auto()
-    ELECTRIC_HEATING = auto()
+    OTHER = auto()
     ERROR = auto()
 
 
@@ -19,7 +19,7 @@ class AutomationInput:
     pellet_level_percent: float
     pellet_heating_detected: bool
     monotonic_seconds: float
-    electric_heater_requested: bool = False
+    other_requested: bool = False
     cwu_circulation_requested: bool = False
     boiler_loading_requested: bool = False
     pellet_boiler_power_override: bool | None = None
@@ -30,7 +30,7 @@ class AutomationDecision:
     state: BoilerState
     cwu_circulation_on: bool
     boiler_loading_on: bool
-    electric_heater_on: bool
+    other_on: bool
     pellet_boiler_power_on: bool
     pellet_low: bool
     reason: str
@@ -133,13 +133,13 @@ class AutomationController:
                 reason="Rozpoczęto czasowe ładowanie bojlera",
             )
 
-        if inputs.electric_heater_requested:
-            self._state = BoilerState.ELECTRIC_HEATING
+        if inputs.other_requested:
+            self._state = BoilerState.OTHER
             return self._decision(
                 pellet_low=pellet_low,
                 cwu_circulation_on=inputs.cwu_circulation_requested,
-                electric_heater_on=True,
-                reason="Grzałka elektryczna pracuje na żądanie",
+                other_on=True,
+                reason="Inne pracuje na żądanie",
             )
 
         if inputs.pellet_heating_detected:
@@ -167,7 +167,7 @@ class AutomationController:
             state=self._state,
             cwu_circulation_on=False,
             boiler_loading_on=False,
-            electric_heater_on=False,
+            other_on=False,
             pellet_boiler_power_on=True,
             pellet_low=False,
             reason=reason,
@@ -195,15 +195,15 @@ class AutomationController:
             inputs.monotonic_seconds + self._boiler_loading_recheck_seconds
         )
 
-        # Po zakończeniu ładowania grzałka może wystartować w tym samym cyklu,
+        # Po zakończeniu ładowania inne może wystartować w tym samym cyklu,
         # ale nigdy równocześnie z pompą ładującą.
-        if inputs.electric_heater_requested:
-            self._state = BoilerState.ELECTRIC_HEATING
+        if inputs.other_requested:
+            self._state = BoilerState.OTHER
             return self._decision(
                 pellet_low=pellet_low,
                 cwu_circulation_on=inputs.cwu_circulation_requested,
-                electric_heater_on=True,
-                reason="Ładowanie zakończone; uruchomiono grzałkę na żądanie",
+                other_on=True,
+                reason="Ładowanie zakończone; uruchomiono inne na żądanie",
             )
 
         if inputs.pellet_heating_detected:
@@ -227,16 +227,16 @@ class AutomationController:
         pellet_low: bool,
         cwu_circulation_on: bool = False,
         boiler_loading_on: bool = False,
-        electric_heater_on: bool = False,
+        other_on: bool = False,
         reason: str,
     ) -> AutomationDecision:
-        if boiler_loading_on and electric_heater_on:
-            raise RuntimeError("Pompa ładująca i grzałka nie mogą pracować równocześnie")
+        if boiler_loading_on and other_on:
+            raise RuntimeError("Pompa ładująca i inne nie mogą pracować równocześnie")
         return AutomationDecision(
             state=self._state,
             cwu_circulation_on=cwu_circulation_on,
             boiler_loading_on=boiler_loading_on,
-            electric_heater_on=electric_heater_on,
+            other_on=other_on,
             pellet_boiler_power_on=getattr(self, "_pellet_boiler_power_on", True),
             pellet_low=pellet_low,
             reason=reason,
