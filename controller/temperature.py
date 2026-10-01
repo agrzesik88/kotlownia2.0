@@ -6,6 +6,7 @@ from controller.config import TemperatureConfig
 from controller.errors import (
     InvalidMeasurementError,
     SensorNotFoundError,
+    SensorTimeoutError,
 )
 
 
@@ -13,13 +14,53 @@ class TemperatureSensor:
     def __init__(self, config: TemperatureConfig, simulation: bool) -> None:
         self.config = config
         self.simulation = simulation
+        self._last_good_temperature_c: float | None = None
+        self._consecutive_failures = 0
+        self._using_last_good_value = False
+
+    @property
+    def consecutive_failures(self) -> int:
+        return self._consecutive_failures
+
+    @property
+    def using_last_good_value(self) -> bool:
+        return self._using_last_good_value
 
     def read_celsius(self) -> float:
         if self.simulation:
-            return self.config.simulation_value_c
+            value = self.config.simulation_value_c
+            self._mark_success(value)
+            return value
 
         sensor_file = self.config.sensor_file or self._discover_sensor_file()
-        return self._read_ds18b20(sensor_file)
+
+        try:
+            value = self._read_ds18b20(sensor_file)
+        except (SensorNotFoundError, InvalidMeasurementError, SensorTimeoutError) as exc:
+            return self._handle_failed_read(exc)
+
+        self._mark_success(value)
+        return value
+
+    def _mark_success(self, temperature_c: float) -> None:
+        self._last_good_temperature_c = temperature_c
+        self._consecutive_failures = 0
+        self._using_last_good_value = False
+
+    def _handle_failed_read(self, exc: Exception) -> float:
+        self._consecutive_failures += 1
+        self._using_last_good_value = self._last_good_temperature_c is not None
+
+        if (
+            self._last_good_temperature_c is not None
+            and self._consecutive_failures < self.config.max_consecutive_failures
+        ):
+            return self._last_good_temperature_c
+
+        raise SensorTimeoutError(
+            "DS18B20 nie dostarczył poprawnego pomiaru przez "
+            f"{self._consecutive_failures} kolejnych cykli"
+        ) from exc
 
     @staticmethod
     def _discover_sensor_file() -> Path:
