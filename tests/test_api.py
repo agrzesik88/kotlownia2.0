@@ -232,3 +232,14 @@ def test_schedule_status_reads_actual_cwu_duration(tmp_path: Path) -> None:
     response = client.get("/api/schedule-status")
     assert response.status_code == 200
     assert response.json()["cwu_circulation_last_duration_seconds"] == 187.4
+
+
+def test_timed_manual_control_accepts_duration(tmp_path: Path) -> None:
+    client = TestClient(create_app(write_config(tmp_path)))
+    response = client.post(
+        "/api/manual/activate",
+        json={"output": "cwu_circulation", "duration_minutes": 5},
+    )
+    assert response.status_code == 200
+    assert response.json()["cwu_circulation_active"] is False
+    assert response.json()["cwu_circulation_until"] is not None
