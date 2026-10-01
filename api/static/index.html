@@ -99,8 +99,8 @@
     <div class="schedule-head"><h2>Ustawienia automatyki</h2><button id="saveAutomation">Zapisz</button></div>
     <div class="grid">
       <label>Próg ładowania bojlera [°C]<br><input id="loadingTemp" type="number" min="-55" max="125" step="0.1"></label>
-      <label>Czas ładowania bojlera [s]<br><input id="loadingSeconds" type="number" min="1" max="86400"></label>
-      <label>Ponowne sprawdzenie [s]<br><input id="loadingRecheck" type="number" min="1" max="604800"></label>
+      <label>Czas ładowania bojlera [min]<br><input id="loadingMinutes" type="number" min="1" max="1440"></label>
+      <label>Ponowne sprawdzenie [min]<br><input id="loadingRecheckMinutes" type="number" min="1" max="10080"></label>
       <label>Próg niskiego pelletu [%]<br><input id="pelletLow" type="number" min="0" max="100" step="0.1"></label>
     </div>
     <p class="muted">Zmiana jest zapisywana do konfiguracji runtime. Sterownik zastosuje ją w kolejnym cyklu.</p>
@@ -145,8 +145,8 @@ async function loadAutomationSettings(){
   try{
     const s=await json('/api/automation-settings');
     loadingTemp.value=s.boiler_loading_temperature_c;
-    loadingSeconds.value=s.boiler_loading_seconds;
-    loadingRecheck.value=s.boiler_loading_recheck_seconds;
+    loadingMinutes.value=s.boiler_loading_minutes;
+    loadingRecheckMinutes.value=s.boiler_loading_recheck_minutes;
     pelletLow.value=s.pellet_low_level_percent;
   }catch(err){automationSaveStatus.textContent='Błąd odczytu: '+err.message}
 }
@@ -154,8 +154,8 @@ saveAutomation.onclick=async()=>{
   try{
     const payload={
       boiler_loading_temperature_c:Number(loadingTemp.value),
-      boiler_loading_seconds:Number(loadingSeconds.value),
-      boiler_loading_recheck_seconds:Number(loadingRecheck.value),
+      boiler_loading_minutes:Number(loadingMinutes.value),
+      boiler_loading_recheck_minutes:Number(loadingRecheckMinutes.value),
       pellet_low_level_percent:Number(pelletLow.value)
     };
     await json('/api/automation-settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
