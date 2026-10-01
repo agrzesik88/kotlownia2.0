@@ -119,10 +119,10 @@ def test_manual_control_can_be_activated_and_cleared(tmp_path: Path) -> None:
     client = TestClient(create_app(write_config(tmp_path)))
     response = client.post(
         "/api/manual/activate",
-        json={"output": "cwu_circulation", "duration_minutes": 10},
+        json={"output": "cwu_circulation"},
     )
     assert response.status_code == 200
-    assert response.json()["cwu_circulation_until"] is not None
+    assert response.json()["cwu_circulation_active"] is True
 
     status = client.get("/api/manual")
     assert status.status_code == 200
@@ -130,14 +130,14 @@ def test_manual_control_can_be_activated_and_cleared(tmp_path: Path) -> None:
 
     cleared = client.post("/api/manual/clear")
     assert cleared.status_code == 200
-    assert cleared.json()["cwu_circulation_until"] is None
+    assert cleared.json()["cwu_circulation_active"] is False
 
 
 def test_manual_control_supports_boiler_and_power(tmp_path: Path) -> None:
     client = TestClient(create_app(write_config(tmp_path)))
-    loading = client.post("/api/manual/activate", json={"output": "boiler_loading", "duration_minutes": 10})
+    loading = client.post("/api/manual/activate", json={"output": "boiler_loading"})
     assert loading.status_code == 200
-    power = client.post("/api/manual/activate", json={"output": "pellet_boiler_power_off", "duration_minutes": 15})
+    power = client.post("/api/manual/activate", json={"output": "pellet_boiler_power_off"})
     assert power.status_code == 200
     status = client.get("/api/manual").json()
     assert status["boiler_loading_active"] is True
@@ -148,7 +148,7 @@ def test_manual_control_rejects_unknown_output(tmp_path: Path) -> None:
     client = TestClient(create_app(write_config(tmp_path)))
     response = client.post(
         "/api/manual/activate",
-        json={"output": "unknown_output", "duration_minutes": 10},
+        json={"output": "unknown_output"},
     )
     assert response.status_code == 422
 
