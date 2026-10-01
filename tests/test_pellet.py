@@ -34,9 +34,9 @@ def test_distance_is_converted_to_level() -> None:
     config = load_config()
     sensor = PelletSensor(config.pellet, simulation=True)
 
-    assert sensor.distance_to_percent(10.0) == 100.0
-    assert sensor.distance_to_percent(100.0) == 0.0
-    assert sensor.distance_to_percent(55.0) == 50.0
+    assert sensor.distance_to_percent(8.9) == 100.0
+    assert sensor.distance_to_percent(57.0) == 0.0
+    assert sensor.distance_to_percent(32.95) == pytest.approx(50.0)
 
 
 def test_single_bad_samples_do_not_invalidate_measurement_series() -> None:
@@ -51,7 +51,7 @@ def test_single_bad_samples_do_not_invalidate_measurement_series() -> None:
 
     level = sensor.read_level_percent()
 
-    assert level == pytest.approx((100.0 - 31.0) / 90.0 * 100.0)
+    assert level == pytest.approx((57.0 - 31.0) / 48.1 * 100.0)
     assert sensor.consecutive_failures == 0
     assert sensor.using_last_good_value is False
 
@@ -100,7 +100,7 @@ def test_successful_read_resets_failure_counter() -> None:
     sensor.read_level_percent()
     recovered_level = sensor.read_level_percent()
 
-    assert recovered_level == pytest.approx((100.0 - 31.0) / 90.0 * 100.0)
+    assert recovered_level == pytest.approx((57.0 - 31.0) / 48.1 * 100.0)
     assert sensor.consecutive_failures == 0
     assert sensor.using_last_good_value is False
 
@@ -125,10 +125,10 @@ def test_small_level_changes_are_smoothed_by_filter() -> None:
 
     levels = [sensor.read_level_percent() for _ in range(5)]
 
-    assert levels[0] == 0.0
-    assert levels[1] == 0.0
-    assert levels[2] == 0.0
-    assert levels[3] == pytest.approx((57.0 - 56.4) / 48.1 * 100.0)
+    assert levels[0] == pytest.approx(0.0)
+    assert levels[1] == pytest.approx(0.0)
+    assert levels[2] == pytest.approx((57.0 - 56.6) / 48.1 * 100.0)
+    assert levels[3] == levels[2]
     assert levels[4] == levels[3]
 
 
