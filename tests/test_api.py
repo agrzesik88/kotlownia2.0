@@ -92,7 +92,7 @@ def test_schedule_can_be_saved_and_read(tmp_path: Path) -> None:
         "timezone": "Europe/Warsaw",
         "cwu_circulation": {
             "enabled": True,
-            "windows": [{"start": "06:00", "end": "06:10", "weekdays": ["mon"], "duration_minutes": 10, "repeat_minutes": 60}],
+            "windows": [{"start": "06:00", "end": "06:10", "weekdays": ["mon"], "duration_minutes": 10, "repeat_minutes": 60, "enabled": true}],
         },
         "other": {"enabled": False, "windows": []},
     }
@@ -208,7 +208,8 @@ def test_schedule_status_reads_last_cwu_start_event(tmp_path: Path) -> None:
     config = write_config(tmp_path)
     history = HistoryRepository(tmp_path / "history.db")
     try:
-        history.record_event(ControllerEvent(EventType.CWU_CIRCULATION_SCHEDULE_STARTED, "Cyrkulacja CWU została włączona przez harmonogram"))
+        history.record_event(ControllerEvent(EventType.CWU_CIRCULATION_SCHEDULE_STARTED, "Cyrkulacja CWU została włączona przez harmonogram", occurred_at="2026-10-01T15:00:00+00:00"))
+        history.record_event(ControllerEvent(EventType.CWU_CIRCULATION_SCHEDULE_STOPPED, "Cyrkulacja CWU została wyłączona po zakończeniu harmonogramu", {"duration_seconds": 120.0}, occurred_at="2026-10-01T15:02:00+00:00"))
     finally:
         history.close()
     client = TestClient(create_app(config))
