@@ -25,6 +25,8 @@ sample_count = 5
 minimum_valid_samples = 3
 max_consecutive_failures = 5
 sample_interval_seconds = 0.05
+# Zmiana poziomu mniejsza lub równa tej wartości jest ignorowana.
+level_tolerance_percent = 0.5
 
 simulation_level_percent = 75.0
 
