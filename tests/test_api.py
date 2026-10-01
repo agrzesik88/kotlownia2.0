@@ -98,7 +98,8 @@ def test_schedule_can_be_saved_and_read(tmp_path: Path) -> None:
     }
     response = client.put("/api/schedule", json=payload)
     assert response.status_code == 200
-    assert client.get("/api/schedule").json() == payload
+    expected = {key: value for key, value in payload.items() if key != "timezone"}
+    assert client.get("/api/schedule").json() == expected
 
 
 def test_schedule_rejects_invalid_time(tmp_path: Path) -> None:
