@@ -144,7 +144,7 @@ def create_app(config_path: str | Path = "config/settings.toml") -> FastAPI:
             raise HTTPException(409, "Sterowanie ręczne jest wyłączone")
         try:
             state = app.state.manual_repository.activate(
-                payload.output
+                payload.output, payload.duration_minutes
             )
         except ValueError as exc:
             raise HTTPException(422, str(exc)) from exc
