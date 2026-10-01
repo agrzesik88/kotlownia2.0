@@ -46,6 +46,26 @@ class AutomationController:
         boiler_loading_recheck_seconds: float = 3600.0,
         pellet_low_level_percent: float = 15.0,
     ) -> None:
+        self._state = BoilerState.BOOT
+        self._boiler_loading_started_at: float | None = None
+        self._next_boiler_loading_check_at: float = 0.0
+        self._last_monotonic_seconds: float | None = None
+        self.update_settings(
+            boiler_loading_temperature_c=boiler_loading_temperature_c,
+            boiler_loading_seconds=boiler_loading_seconds,
+            boiler_loading_recheck_seconds=boiler_loading_recheck_seconds,
+            pellet_low_level_percent=pellet_low_level_percent,
+        )
+
+    def update_settings(
+        self,
+        *,
+        boiler_loading_temperature_c: float,
+        boiler_loading_seconds: float,
+        boiler_loading_recheck_seconds: float,
+        pellet_low_level_percent: float,
+    ) -> None:
+        """Aktualizuje parametry automatyki bez resetowania jej bieżącego stanu."""
         if boiler_loading_seconds <= 0:
             raise ValueError("Czas ładowania bojlera musi być większy od zera")
         if boiler_loading_recheck_seconds <= 0:
@@ -55,14 +75,10 @@ class AutomationController:
         if not 0.0 <= pellet_low_level_percent <= 100.0:
             raise ValueError("Próg niskiego poziomu pelletu jest poza zakresem")
 
-        self._state = BoilerState.BOOT
         self._boiler_loading_temperature_c = boiler_loading_temperature_c
         self._boiler_loading_seconds = boiler_loading_seconds
         self._boiler_loading_recheck_seconds = boiler_loading_recheck_seconds
         self._pellet_low_level_percent = pellet_low_level_percent
-        self._boiler_loading_started_at: float | None = None
-        self._next_boiler_loading_check_at: float = 0.0
-        self._last_monotonic_seconds: float | None = None
 
     @property
     def state(self) -> BoilerState:
