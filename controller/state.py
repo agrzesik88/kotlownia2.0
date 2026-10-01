@@ -37,6 +37,7 @@ class ControllerState:
     automation_state: str = "BOOT"
     automation_reason: str = ""
     output_status: dict[str, dict[str, str]] = field(default_factory=dict)
+    alerts: list[dict[str, str]] = field(default_factory=list)
     simulation_mode: bool = True
     last_error: str | None = None
     updated_at: str = ""

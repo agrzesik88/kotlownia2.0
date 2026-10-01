@@ -31,6 +31,12 @@
     .chart-time-label { font-size:12px; fill:#94a3b8; }
     .chart-last-label { font-size:13px; font-weight:700; }
     .error { background: #7f1d1d; }
+    .alerts { display:flex; flex-direction:column; gap:8px; }
+    #alertsSection { margin-bottom:18px; }
+    .alert { padding:12px 14px; border-radius:10px; border:1px solid #475569; background:#111827; }
+    .alert-warning { border-color:#b45309; background:#451a03; }
+    .alert-error { border-color:#b91c1c; background:#450a0a; }
+    .alert-title { font-weight:700; margin-right:8px; }
     svg { width: 100%; height: 230px; background: #111827; border-radius: 10px; }
     table { width: 100%; border-collapse: collapse; }
     th,td { text-align: left; padding: 8px; border-bottom: 1px solid #374151; }
@@ -49,6 +55,10 @@
 <body>
 <header><h1>Kotłownia 2.0</h1><div class="muted" id="updated">Łączenie…</div></header>
 <main>
+  <section id="alertsSection" style="display:none">
+    <h2>Ostrzeżenia</h2>
+    <div class="alerts" id="alerts"></div>
+  </section>
   <div class="grid">
     <div class="card"><div class="muted">Temperatura rury</div><div class="value" id="temp">—</div></div>
     <div class="card"><div class="muted">Poziom pelletu</div><div class="value" id="pellet">—</div></div>
@@ -134,8 +144,12 @@ const scheduleDefs=[['cwu_circulation','Cyrkulacja CWU'],['other','Inne']];
 let schedule={};
 function fmt(v,s=''){return v==null?'—':Number(v).toFixed(1)+s}
 async function json(url,opts){const r=await fetch(url,opts);if(!r.ok)throw new Error(await r.text());return r.json()}
-async function refresh(){try{const [s,h,e,a]=await Promise.all([json('/api/status'),json('/api/history?limit=120'),json('/api/events?limit=20'),json('/api/automation-status')]);
+async function refresh(){try{const [s,h,e,a,al]=await Promise.all([json('/api/status'),json('/api/history?limit=120'),json('/api/events?limit=20'),json('/api/automation-status'),json('/api/alerts')]);
  temp.textContent=fmt(s.pipe_temperature_c,'°C');pellet.textContent=fmt(s.pellet_level_percent,'%');state.textContent=s.automation_state;mode.textContent=s.simulation_mode?'SYMULACJA':'REALNY';updated.textContent='Aktualizacja: '+new Date(s.updated_at).toLocaleString();reason.textContent=s.automation_reason+(s.last_error?' — '+s.last_error:'');
+ const alertBox=document.getElementById('alerts');
+ const activeAlerts=al.alerts||[];
+ document.getElementById('alertsSection').style.display=activeAlerts.length?'block':'none';
+ alertBox.innerHTML=activeAlerts.map(x=>`<div class="alert alert-${x.severity.toLowerCase()}"><span class="alert-title">${x.severity==='ERROR'?'BŁĄD':'OSTRZEŻENIE'}</span>${x.message}</div>`).join('');
  const outputNames={cwu_circulation:'Cyrkulacja CWU',boiler_loading:'Pompa bojlera',other:'Inne',pellet_boiler_power:'Zasilanie pieca'};
  outputsEl=document.getElementById('outputs');outputsEl.innerHTML=Object.entries(a.outputs).map(([key,o])=>`<div class="output-card"><div class="output-head"><strong>${outputNames[key]||key}</strong><span class="output-state ${o.state==='ON'?'on':''}">${o.state}</span></div><div class="output-mode">Żądanie: ${o.requested||o.state} · Tryb: ${o.mode}</div><div class="output-reason">${o.reason}</div></div>`).join('');renderManualState(s);draw(h);events.innerHTML=e.map(x=>`<tr><td>${new Date(x.occurred_at).toLocaleString()}</td><td>${x.event_type}</td><td>${x.message}</td></tr>`).join('');}catch(err){updated.textContent='Błąd połączenia: '+err.message}}
 function untilText(value){return value?'Aktywne do '+new Date(value).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}):'Nieaktywne'}
