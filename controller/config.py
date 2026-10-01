@@ -42,7 +42,7 @@ class RelayConfig:
     active_low: bool
     cwu_circulation_gpio: int
     boiler_loading_gpio: int
-    electric_heater_gpio: int
+    other_gpio: int
     pellet_boiler_power_gpio: int
 
 
@@ -163,7 +163,7 @@ def load_config(path: str | Path = "config/settings.toml") -> ControllerConfig:
             active_low=bool(relays["active_low"]),
             cwu_circulation_gpio=int(relays["cwu_circulation_gpio"]),
             boiler_loading_gpio=int(relays["boiler_loading_gpio"]),
-            electric_heater_gpio=int(relays["electric_heater_gpio"]),
+            other_gpio=int(relays["other_gpio"]),
             pellet_boiler_power_gpio=int(relays["pellet_boiler_power_gpio"]),
         ),
         automation=AutomationConfig(
