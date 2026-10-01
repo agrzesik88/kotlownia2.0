@@ -82,6 +82,11 @@ class PelletSensor:
                 "pellet.sample_interval_seconds nie może być ujemne"
             )
 
+        if self.config.level_tolerance_percent < 0:
+            raise InvalidMeasurementError(
+                "pellet.level_tolerance_percent nie może być ujemne"
+            )
+
     def _initialize_gpio(self) -> None:
         try:
             from gpiozero import DistanceSensor
@@ -125,6 +130,13 @@ class PelletSensor:
             level_percent = self.distance_to_percent(distance_cm)
         except (SensorError, SensorTimeoutError, InvalidMeasurementError) as exc:
             return self._handle_failed_read(exc)
+
+        if (
+            self._last_good_level_percent is not None
+            and abs(level_percent - self._last_good_level_percent)
+            <= self.config.level_tolerance_percent
+        ):
+            level_percent = self._last_good_level_percent
 
         self._mark_success(level_percent)
         return level_percent
