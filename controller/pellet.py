@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import time
 import warnings
+from collections import deque
 from statistics import median
 from typing import Protocol
 
@@ -23,6 +24,8 @@ class DistanceSensorProtocol(Protocol):
 
 
 class PelletSensor:
+    _LEVEL_FILTER_WINDOW = 5
+
     def __init__(
         self,
         config: PelletConfig,
@@ -36,6 +39,9 @@ class PelletSensor:
         self._last_good_level_percent: float | None = None
         self._consecutive_failures = 0
         self._using_last_good_value = False
+        self._level_history: deque[float] = deque(
+            maxlen=self._LEVEL_FILTER_WINDOW
+        )
 
         self._validate_config()
 
@@ -61,9 +67,9 @@ class PelletSensor:
                 "od pellet.full_distance_cm"
             )
 
-        if self.config.sample_count < 1:
+        if self.config.sample_count < 3:
             raise InvalidMeasurementError(
-                "pellet.sample_count musi być większe lub równe 1"
+                "pellet.sample_count musi być większe lub równe 3"
             )
 
         if not 1 <= self.config.minimum_valid_samples <= self.config.sample_count:
@@ -97,11 +103,6 @@ class PelletSensor:
                 "przed wyłączeniem symulacji pelletu."
             ) from exc
 
-        # gpiozero performs echo monitoring in a background thread, so a local
-        # catch_warnings() around ``sensor.distance`` cannot intercept these
-        # warnings reliably. The controller has its own failure counters and
-        # stale-value diagnostics, therefore these low-level warnings would only
-        # duplicate information and flood journald.
         warnings.filterwarnings("ignore", category=DistanceSensorNoEcho)
         warnings.filterwarnings("ignore", category=PWMSoftwareFallback)
 
@@ -127,19 +128,22 @@ class PelletSensor:
 
         try:
             distance_cm = self.read_distance_cm()
-            level_percent = self.distance_to_percent(distance_cm)
+            raw_level_percent = self.distance_to_percent(distance_cm)
         except (SensorError, SensorTimeoutError, InvalidMeasurementError) as exc:
             return self._handle_failed_read(exc)
 
+        self._level_history.append(raw_level_percent)
+        filtered_level_percent = float(median(self._level_history))
+
         if (
             self._last_good_level_percent is not None
-            and abs(level_percent - self._last_good_level_percent)
+            and abs(filtered_level_percent - self._last_good_level_percent)
             <= self.config.level_tolerance_percent
         ):
-            level_percent = self._last_good_level_percent
+            filtered_level_percent = self._last_good_level_percent
 
-        self._mark_success(level_percent)
-        return level_percent
+        self._mark_success(filtered_level_percent)
+        return filtered_level_percent
 
     def _mark_success(self, level_percent: float) -> None:
         self._last_good_level_percent = level_percent
@@ -189,7 +193,6 @@ class PelletSensor:
 
                 measurements.append(distance_cm)
             except Exception:
-                # Pojedyncza nieudana próbka nie unieważnia całej serii.
                 pass
 
             if index < self.config.sample_count - 1:
@@ -200,6 +203,13 @@ class PelletSensor:
                 "Za mało poprawnych próbek HC-SR04: "
                 f"{len(measurements)}/{self.config.sample_count}"
             )
+
+        # Odrzucamy pojedynczy skrajny odczyt z obu stron, jeśli mamy
+        # wystarczająco dużo poprawnych próbek. Dzięki temu pojedynczy
+        # nietypowy pomiar HC-SR04 nie przesuwa wyniku.
+        if len(measurements) >= 5:
+            ordered = sorted(measurements)
+            measurements = ordered[1:-1]
 
         return float(median(measurements))
 
