@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import replace
 from threading import Event
 from time import monotonic
 from typing import Callable
@@ -144,6 +145,13 @@ class ControllerApplication:
                     boiler_loading_requested=manual.boiler_loading_requested,
                     pellet_boiler_power_override=manual.pellet_boiler_power_override,
                 )
+            )
+            # Trwałe sterowanie ręczne ma pierwszeństwo przed automatyką i harmonogramem.
+            decision = replace(
+                decision,
+                cwu_circulation_on=decision.cwu_circulation_on or manual.cwu_circulation_requested,
+                boiler_loading_on=decision.boiler_loading_on or manual.boiler_loading_requested,
+                other_on=decision.other_on or manual.other_requested,
             )
             self.relays.apply(
                 cwu_circulation_on=decision.cwu_circulation_on,
