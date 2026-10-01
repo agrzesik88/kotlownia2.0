@@ -194,6 +194,8 @@ class ControllerApplication:
                 self.event_bus.publish(ControllerEvent(EventType.CONTROLLER_ERROR, f"Błąd sterownika: {exc}", {"error": str(exc)}))
             self._had_error = True
         finally:
+            self.state.temperature_sensor_consecutive_failures = self.temperature.consecutive_failures
+            self.state.temperature_sensor_stale = self.temperature.using_last_good_value
             self.state.pellet_sensor_consecutive_failures = self.pellet.consecutive_failures
             self.state.pellet_sensor_stale = self.pellet.using_last_good_value
             self._update_alerts()
@@ -278,6 +280,8 @@ class ControllerApplication:
         alerts: list[dict[str, str]] = []
         if self.state.pellet_low:
             alerts.append({"severity": "WARNING", "code": "PELLET_LOW", "message": f"Niski poziom pelletu: {self.state.pellet_level_percent:.1f}%"})
+        if self.state.temperature_sensor_stale:
+            alerts.append({"severity": "WARNING", "code": "TEMPERATURE_SENSOR_STALE", "message": "DS18B20 nie dostarczył poprawnego pomiaru. Używany jest ostatni poprawny odczyt " f"({self.state.temperature_sensor_consecutive_failures} błędów)."})
         if self.state.pellet_sensor_stale:
             alerts.append({"severity": "WARNING", "code": "PELLET_SENSOR_STALE", "message": "HC-SR04 nie dostarcza poprawnych pomiarów. Używany jest ostatni poprawny odczyt " f"({self.state.pellet_sensor_consecutive_failures} błędów)."})
         if self.state.last_error:
@@ -336,6 +340,8 @@ class ControllerApplication:
         self.notifications.info(f"{self.config.application.name} uruchomiona; symulacja={self.config.application.simulation}")
         while not self.stop_event.is_set():
             state = self.run_once()
+            if state.temperature_sensor_stale:
+                logging.warning("DS18B20: używam ostatniego poprawnego pomiaru; kolejne błędy=%s", state.temperature_sensor_consecutive_failures)
             if state.pellet_sensor_stale:
                 logging.warning("HC-SR04: używam ostatniego poprawnego pomiaru; kolejne błędy=%s", state.pellet_sensor_consecutive_failures)
             logging.info("Temperatura=%s°C, pellet=%s%%, automat=%s, powód=%s", state.pipe_temperature_c, state.pellet_level_percent, state.automation_state, state.automation_reason)
