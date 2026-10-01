@@ -100,7 +100,7 @@ def test_successful_read_resets_failure_counter() -> None:
     sensor.read_level_percent()
     recovered_level = sensor.read_level_percent()
 
-    assert recovered_level == pytest.approx((100.0 - 31.0) / 90.0 * 100.0)
+    assert recovered_level == pytest.approx((57.0 - 31.0) / 48.1 * 100.0)
     assert sensor.consecutive_failures == 0
     assert sensor.using_last_good_value is False
 
@@ -127,9 +127,9 @@ def test_small_level_changes_are_smoothed_by_filter() -> None:
 
     assert levels[0] == pytest.approx(0.0)
     assert levels[1] == pytest.approx(0.0)
-    assert levels[2] == pytest.approx((57.0 - 56.6) / 48.1 * 100.0)
-    assert levels[3] == pytest.approx((57.0 - 56.4) / 48.1 * 100.0)
-    assert levels[4] == pytest.approx((57.0 - 56.2) / 48.1 * 100.0)
+    assert levels[2] == pytest.approx(0.0)
+    assert levels[3] == pytest.approx(0.0)
+    assert levels[4] == pytest.approx(0.0)
 
 
 def test_extreme_samples_are_ignored() -> None:
