@@ -57,6 +57,17 @@ class HistoryRepository:
         )
         self._connection.commit()
 
+        # Migracja starszej bazy po zmianie nazwy wyjścia z grzałki na "Inne".
+        columns = {
+            row[1]
+            for row in self._connection.execute("PRAGMA table_info(measurements)").fetchall()
+        }
+        if "electric_heater_on" in columns and "other_on" not in columns:
+            self._connection.execute(
+                "ALTER TABLE measurements RENAME COLUMN electric_heater_on TO other_on"
+            )
+            self._connection.commit()
+
     def record_state(self, state: ControllerState) -> None:
         self._connection.execute(
             """
