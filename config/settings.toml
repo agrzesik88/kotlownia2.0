@@ -1,6 +1,6 @@
 [application]
 name = "Kotlownia 2.0"
-simulation = true
+simulation = false
 state_file = "runtime/state.json"
 loop_interval_seconds = 1.0
 
