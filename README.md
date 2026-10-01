@@ -8,7 +8,7 @@ Lokalny sterownik kotłowni dla Raspberry Pi. Automatyka działa niezależnie od
 - domyślny próg wynosi `45°C`,
 - pompa pracuje przez skonfigurowany czas, domyślnie `600 s` (10 minut),
 - po zakończeniu pracy kolejne sprawdzenie możliwości ładowania następuje po skonfigurowanej przerwie, domyślnie `3600 s` (1 godzina),
-- grzałka elektryczna nigdy nie może pracować równocześnie z pompą ładującą,
+- inne nigdy nie może pracować równocześnie z pompą ładującą,
 - żądanie pracy grzałki jest przygotowane jako wejście dla przyszłego harmonogramu lub API; domyślnie jest wyłączone,
 - niski poziom pelletu ustawia alarm w stanie sterownika i może wysłać e-mail,
 - błąd czujnika przełącza automat w stan `ERROR`, wyłącza pompę ładującą i grzałkę.
@@ -248,7 +248,7 @@ http://ADRES_IP_RASPBERRY:8088
 Nie przekierowuj portu `8088` na routerze. Pierwsza wersja panelu jest przeznaczona
 wyłącznie do zaufanej sieci LAN i nie ma jeszcze logowania użytkowników.
 
-Grzałka ma harmonogram domyślnie wyłączony. Nie włączaj jej czasowo, dopóki nie
+Inne ma harmonogram domyślnie wyłączony. Nie włączaj jej czasowo, dopóki nie
 potwierdzimy niezależnego termostatu, zabezpieczenia nadtemperaturowego i poprawnego
 okablowania stycznika. Harmonogram cyrkulacji CWU można bezpiecznie testować nadal
 w trybie `simulation = true`.
@@ -272,7 +272,7 @@ usługą i nie przełącza GPIO bezpośrednio.
 Dostępne czasy z panelu:
 
 - cyrkulacja CWU: 5, 10, 20 lub 30 minut,
-- grzałka elektryczna: 15, 30 lub 60 minut.
+- inne: 15, 30 lub 60 minut.
 
 Każde polecenie ma czas wygaśnięcia zapisany w UTC. Po jego upływie sterownik
 automatycznie wraca do harmonogramu. Można też wyłączyć pojedyncze polecenie
