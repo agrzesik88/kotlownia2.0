@@ -111,8 +111,8 @@ def test_automation_settings_can_be_saved_and_read(tmp_path: Path) -> None:
     client = TestClient(create_app(write_config(tmp_path)))
     payload = {
         "boiler_loading_temperature_c": 50.5,
-        "boiler_loading_seconds": 900,
-        "boiler_loading_recheck_seconds": 7200,
+        "boiler_loading_minutes": 15,
+        "boiler_loading_recheck_minutes": 120,
         "pellet_low_level_percent": 20.0,
     }
     response = client.put("/api/automation-settings", json=payload)
@@ -127,8 +127,8 @@ def test_automation_settings_reject_invalid_values(tmp_path: Path) -> None:
         "/api/automation-settings",
         json={
             "boiler_loading_temperature_c": 200,
-            "boiler_loading_seconds": 0,
-            "boiler_loading_recheck_seconds": 60,
+            "boiler_loading_minutes": 0,
+            "boiler_loading_recheck_minutes": 60,
             "pellet_low_level_percent": 15,
         },
     )
