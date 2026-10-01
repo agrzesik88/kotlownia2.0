@@ -10,7 +10,7 @@ from typing import Callable
 @dataclass(frozen=True, slots=True)
 class ManualControlState:
     cwu_circulation_until: str | None = None
-    electric_heater_until: str | None = None
+    other_until: str | None = None
     boiler_loading_until: str | None = None
     pellet_boiler_power_override: bool | None = None
     pellet_boiler_power_until: str | None = None
@@ -22,11 +22,11 @@ class ManualControlState:
 @dataclass(frozen=True, slots=True)
 class ManualControlDecision:
     cwu_circulation_requested: bool = False
-    electric_heater_requested: bool = False
+    other_requested: bool = False
     boiler_loading_requested: bool = False
     pellet_boiler_power_override: bool | None = None
     cwu_circulation_until: str | None = None
-    electric_heater_until: str | None = None
+    other_until: str | None = None
     boiler_loading_until: str | None = None
     pellet_boiler_power_until: str | None = None
 
@@ -52,7 +52,7 @@ class ManualControlRepository:
             raise ValueError("Wymuszenie zasilania pieca musi być wartością logiczną")
         return ManualControlState(
             cwu_circulation_until=self._validate_timestamp(raw.get("cwu_circulation_until")),
-            electric_heater_until=self._validate_timestamp(raw.get("electric_heater_until")),
+            other_until=self._validate_timestamp(raw.get("other_until")),
             boiler_loading_until=self._validate_timestamp(raw.get("boiler_loading_until")),
             pellet_boiler_power_override=power_override,
             pellet_boiler_power_until=self._validate_timestamp(raw.get("pellet_boiler_power_until")),
@@ -62,12 +62,12 @@ class ManualControlRepository:
         state = self.load()
         now = self._ensure_utc(self._now())
         cwu_active = self._is_active(state.cwu_circulation_until, now)
-        heater_active = self._is_active(state.electric_heater_until, now)
+        other_active = self._is_active(state.other_until, now)
         loading_active = self._is_active(state.boiler_loading_until, now)
         power_active = self._is_active(state.pellet_boiler_power_until, now)
         cleaned = ManualControlState(
             cwu_circulation_until=state.cwu_circulation_until if cwu_active else None,
-            electric_heater_until=state.electric_heater_until if heater_active else None,
+            other_until=state.other_until if other_active else None,
             boiler_loading_until=state.boiler_loading_until if loading_active else None,
             pellet_boiler_power_override=(state.pellet_boiler_power_override if power_active else None),
             pellet_boiler_power_until=state.pellet_boiler_power_until if power_active else None,
@@ -76,11 +76,11 @@ class ManualControlRepository:
             self.save(cleaned)
         return ManualControlDecision(
             cwu_circulation_requested=cwu_active,
-            electric_heater_requested=heater_active,
+            other_requested=other_active,
             boiler_loading_requested=loading_active,
             pellet_boiler_power_override=cleaned.pellet_boiler_power_override,
             cwu_circulation_until=cleaned.cwu_circulation_until,
-            electric_heater_until=cleaned.electric_heater_until,
+            other_until=cleaned.other_until,
             boiler_loading_until=cleaned.boiler_loading_until,
             pellet_boiler_power_until=cleaned.pellet_boiler_power_until,
         )
@@ -88,7 +88,7 @@ class ManualControlRepository:
     def activate(self, output: str, duration_minutes: int) -> ManualControlState:
         limits = {
             "cwu_circulation": (1, 60),
-            "electric_heater": (1, 120),
+            "other": (1, 120),
             "boiler_loading": (1, 60),
             "pellet_boiler_power_on": (1, 240),
             "pellet_boiler_power_off": (1, 240),
@@ -103,12 +103,12 @@ class ManualControlRepository:
         values = state.to_dict()
         if output == "cwu_circulation":
             values["cwu_circulation_until"] = expires_at
-        elif output == "electric_heater":
-            values["electric_heater_until"] = expires_at
+        elif output == "other":
+            values["other_until"] = expires_at
             values["boiler_loading_until"] = None
         elif output == "boiler_loading":
             values["boiler_loading_until"] = expires_at
-            values["electric_heater_until"] = None
+            values["other_until"] = None
         else:
             values["pellet_boiler_power_override"] = output.endswith("_on")
             values["pellet_boiler_power_until"] = expires_at
@@ -121,8 +121,8 @@ class ManualControlRepository:
         values = state.to_dict()
         if output == "cwu_circulation":
             values["cwu_circulation_until"] = None
-        elif output == "electric_heater":
-            values["electric_heater_until"] = None
+        elif output == "other":
+            values["other_until"] = None
         elif output == "boiler_loading":
             values["boiler_loading_until"] = None
         elif output == "pellet_boiler_power":
