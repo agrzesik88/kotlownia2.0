@@ -37,7 +37,7 @@ boiler_loading_temperature_c = 45.0
 boiler_loading_seconds = 600
 boiler_loading_recheck_seconds = 3600
 pellet_low_level_percent = 15.0
-pellet_low_reminder_seconds = 86400
+pellet_low_reminder_seconds = 7200
 
 [scheduler]
 enabled = true
