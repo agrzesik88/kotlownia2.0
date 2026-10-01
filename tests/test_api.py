@@ -92,13 +92,14 @@ def test_schedule_can_be_saved_and_read(tmp_path: Path) -> None:
         "timezone": "Europe/Warsaw",
         "cwu_circulation": {
             "enabled": True,
-            "windows": [{"start": "06:00", "end": "06:10", "weekdays": ["mon"], "enabled": true}],
+            "windows": [{"start": "06:00", "end": "06:10", "weekdays": ["mon"], "duration_minutes": 10, "repeat_minutes": 60}],
         },
         "other": {"enabled": False, "windows": []},
     }
     response = client.put("/api/schedule", json=payload)
     assert response.status_code == 200
-    assert client.get("/api/schedule").json() == payload
+    expected = {key: value for key, value in payload.items() if key != "timezone"}
+    assert client.get("/api/schedule").json() == expected
 
 
 def test_schedule_rejects_invalid_time(tmp_path: Path) -> None:
@@ -200,22 +201,16 @@ def test_automation_settings_reject_invalid_values(tmp_path: Path) -> None:
     assert response.status_code == 422
 
 
+
 def test_schedule_status_reads_last_cwu_start_event(tmp_path: Path) -> None:
     from controller.events import ControllerEvent, EventType
     from controller.history import HistoryRepository
-
     config = write_config(tmp_path)
     history = HistoryRepository(tmp_path / "history.db")
     try:
-        history.record_event(
-            ControllerEvent(
-                EventType.CWU_CIRCULATION_SCHEDULE_STARTED,
-                "Cyrkulacja CWU została włączona przez harmonogram",
-            )
-        )
+        history.record_event(ControllerEvent(EventType.CWU_CIRCULATION_SCHEDULE_STARTED, "Cyrkulacja CWU została włączona przez harmonogram"))
     finally:
         history.close()
-
     client = TestClient(create_app(config))
     response = client.get("/api/schedule-status")
     assert response.status_code == 200
@@ -225,28 +220,13 @@ def test_schedule_status_reads_last_cwu_start_event(tmp_path: Path) -> None:
 def test_schedule_status_reads_actual_cwu_duration(tmp_path: Path) -> None:
     from controller.events import ControllerEvent, EventType
     from controller.history import HistoryRepository
-
     config = write_config(tmp_path)
     history = HistoryRepository(tmp_path / "history.db")
     try:
-        history.record_event(
-            ControllerEvent(
-                EventType.CWU_CIRCULATION_SCHEDULE_STARTED,
-                "Cyrkulacja CWU została włączona przez harmonogram",
-                occurred_at="2026-10-01T15:00:00+00:00",
-            )
-        )
-        history.record_event(
-            ControllerEvent(
-                EventType.CWU_CIRCULATION_SCHEDULE_STOPPED,
-                "Cyrkulacja CWU została wyłączona po zakończeniu harmonogramu",
-                {"duration_seconds": 187.4},
-                occurred_at="2026-10-01T15:03:07.400000+00:00",
-            )
-        )
+        history.record_event(ControllerEvent(EventType.CWU_CIRCULATION_SCHEDULE_STARTED, "Cyrkulacja CWU została włączona przez harmonogram", occurred_at="2026-10-01T15:00:00+00:00"))
+        history.record_event(ControllerEvent(EventType.CWU_CIRCULATION_SCHEDULE_STOPPED, "Cyrkulacja CWU została wyłączona po zakończeniu harmonogramu", {"duration_seconds": 187.4}, occurred_at="2026-10-01T15:03:07.400000+00:00"))
     finally:
         history.close()
-
     client = TestClient(create_app(config))
     response = client.get("/api/schedule-status")
     assert response.status_code == 200

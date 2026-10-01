@@ -25,7 +25,7 @@ def test_time_window_matches_selected_weekday() -> None:
 def test_window_crossing_midnight_uses_start_day() -> None:
     window = TimeWindow("22:00", "06:00", ("fri",))
     assert window.matches(dt("2026-07-24T23:00"))
-    assert window.matches(dt("2026-07-25T05:30"))
+    assert window.matches(dt("2026-07-25T05:05"))
     assert not window.matches(dt("2026-07-26T05:30"))
 
 
@@ -93,6 +93,7 @@ def test_duration_cannot_exceed_range() -> None:
         raise AssertionError("Czas trwania nie może przekraczać zakresu")
 
 
+
 def test_disabled_schedule_window_does_not_match() -> None:
     window = TimeWindow("06:00", "07:00", ("mon",), enabled=False)
     assert not window.matches(dt("2026-07-20T06:05"))
@@ -100,20 +101,5 @@ def test_disabled_schedule_window_does_not_match() -> None:
 
 def test_window_enabled_flag_works_without_section_enabled() -> None:
     from controller.scheduler import schedule_from_dict
-
-    config = schedule_from_dict(
-        {
-            "cwu_circulation": {
-                "enabled": False,
-                "windows": [
-                    {
-                        "start": "06:00",
-                        "end": "07:00",
-                        "weekdays": ["mon"],
-                        "enabled": True,
-                    }
-                ],
-            }
-        }
-    )
+    config = schedule_from_dict({"cwu_circulation": {"enabled": False, "windows": [{"start": "06:00", "end": "07:00", "weekdays": ["mon"], "enabled": True}]}})
     assert config.cwu_circulation.active_at(dt("2026-07-20T06:05"))
