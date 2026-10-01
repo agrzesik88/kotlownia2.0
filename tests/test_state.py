@@ -6,7 +6,7 @@ def test_default_state_is_safe() -> None:
 
     assert state.cwu_circulation_on is False
     assert state.boiler_loading_on is False
-    assert state.electric_heater_on is False
+    assert state.other_on is False
     assert state.pellet_boiler_power_on is True
     assert state.simulation_mode is True
 
