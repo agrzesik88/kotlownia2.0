@@ -55,6 +55,16 @@ def create_app(config_path: str | Path = "config/settings.toml") -> FastAPI:
     def status() -> dict[str, Any]:
         return _read_state(config)
 
+    @app.get("/api/automation-status")
+    def automation_status() -> dict[str, Any]:
+        state = _read_state(config)
+        return {
+            "automation_state": state.get("automation_state", "BOOT"),
+            "automation_reason": state.get("automation_reason", ""),
+            "outputs": state.get("output_status", {}),
+            "updated_at": state.get("updated_at", ""),
+        }
+
     @app.get("/api/history")
     def history(limit: int = 120) -> list[dict[str, Any]]:
         if limit < 1 or limit > 1000:
