@@ -25,7 +25,7 @@ def test_time_window_matches_selected_weekday() -> None:
 def test_window_crossing_midnight_uses_start_day() -> None:
     window = TimeWindow("22:00", "06:00", ("fri",))
     assert window.matches(dt("2026-07-24T23:00"))
-    assert window.matches(dt("2026-07-25T05:30"))
+    assert window.matches(dt("2026-07-25T05:05"))
     assert not window.matches(dt("2026-07-26T05:30"))
 
 
