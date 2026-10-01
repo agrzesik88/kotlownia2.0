@@ -60,7 +60,7 @@ def test_automation_status_reads_output_reasons(tmp_path: Path) -> None:
                         "mode": "AUTO",
                         "reason": "Trwa czasowe ładowanie bojlera",
                     },
-                    "electric_heater": {
+                    "other": {
                         "state": "OFF",
                         "mode": "AUTO",
                         "reason": "Żądanie zablokowane — pracuje pompa bojlera",
@@ -83,7 +83,7 @@ def test_automation_status_reads_output_reasons(tmp_path: Path) -> None:
     assert data["automation_state"] == "BOILER_LOADING"
     assert data["outputs"]["boiler_loading"]["state"] == "ON"
     assert data["outputs"]["boiler_loading"]["reason"] == "Trwa czasowe ładowanie bojlera"
-    assert data["outputs"]["electric_heater"]["reason"] == "Żądanie zablokowane — pracuje pompa bojlera"
+    assert data["outputs"]["other"]["reason"] == "Żądanie zablokowane — pracuje pompa bojlera"
 
 
 def test_schedule_can_be_saved_and_read(tmp_path: Path) -> None:
@@ -94,7 +94,7 @@ def test_schedule_can_be_saved_and_read(tmp_path: Path) -> None:
             "enabled": True,
             "windows": [{"start": "06:00", "end": "06:10", "weekdays": ["mon"]}],
         },
-        "electric_heater": {"enabled": False, "windows": []},
+        "other": {"enabled": False, "windows": []},
     }
     response = client.put("/api/schedule", json=payload)
     assert response.status_code == 200
@@ -109,7 +109,7 @@ def test_schedule_rejects_invalid_time(tmp_path: Path) -> None:
             "enabled": True,
             "windows": [{"start": "99:00", "end": "06:10", "weekdays": ["mon"]}],
         },
-        "electric_heater": {"enabled": False, "windows": []},
+        "other": {"enabled": False, "windows": []},
     }
     assert client.put("/api/schedule", json=payload).status_code == 422
 
