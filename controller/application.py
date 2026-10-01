@@ -39,6 +39,7 @@ class ControllerApplication:
         self._had_error = False
         self._last_history_recorded_at: float | None = None
         self._last_cwu_circulation_on: bool | None = None
+        self._cwu_schedule_started_at: float | None = None
         self._automation_settings_path = (
             config.application.state_file.parent / "automation_settings.json"
         )
@@ -149,9 +150,10 @@ class ControllerApplication:
                 other_on=decision.other_on,
                 pellet_boiler_power_on=decision.pellet_boiler_power_on,
             )
-            self._record_cwu_schedule_start(
+            self._record_cwu_schedule_transition(
                 decision.cwu_circulation_on,
                 schedule.cwu_circulation_requested,
+                now,
             )
 
             self.state.pipe_temperature_c = temperature
@@ -185,7 +187,21 @@ class ControllerApplication:
                 other_on=decision.other_on,
                 pellet_boiler_power_on=decision.pellet_boiler_power_on,
             )
+            if self._last_cwu_circulation_on is True and self._cwu_schedule_started_at is not None:
+                duration_seconds = max(0.0, now - self._cwu_schedule_started_at)
+                self.event_bus.publish(
+                    ControllerEvent(
+                        EventType.CWU_CIRCULATION_SCHEDULE_STOPPED,
+                        "Cyrkulacja CWU została wyłączona w trybie awaryjnym",
+                        {
+                            "output": "cwu_circulation",
+                            "source": "HARMONOGRAM",
+                            "duration_seconds": round(duration_seconds, 1),
+                        },
+                    )
+                )
             self._last_cwu_circulation_on = False
+            self._cwu_schedule_started_at = None
             self.state.automation_state = decision.state.name
             self.state.automation_reason = decision.reason
             self.state.output_status = {
@@ -209,9 +225,15 @@ class ControllerApplication:
             self._record_history_if_due(now)
         return self.state
 
-    def _record_cwu_schedule_start(self, cwu_circulation_on: bool, schedule_active: bool) -> None:
+    def _record_cwu_schedule_transition(
+        self,
+        cwu_circulation_on: bool,
+        schedule_active: bool,
+        now: float,
+    ) -> None:
         previous = self._last_cwu_circulation_on
         if cwu_circulation_on and schedule_active and previous is not True:
+            self._cwu_schedule_started_at = now
             self.event_bus.publish(
                 ControllerEvent(
                     EventType.CWU_CIRCULATION_SCHEDULE_STARTED,
@@ -219,6 +241,20 @@ class ControllerApplication:
                     {"output": "cwu_circulation", "source": "HARMONOGRAM"},
                 )
             )
+        elif previous is True and not cwu_circulation_on and self._cwu_schedule_started_at is not None:
+            duration_seconds = max(0.0, now - self._cwu_schedule_started_at)
+            self.event_bus.publish(
+                ControllerEvent(
+                    EventType.CWU_CIRCULATION_SCHEDULE_STOPPED,
+                    "Cyrkulacja CWU została wyłączona po zakończeniu harmonogramu",
+                    {
+                        "output": "cwu_circulation",
+                        "source": "HARMONOGRAM",
+                        "duration_seconds": round(duration_seconds, 1),
+                    },
+                )
+            )
+            self._cwu_schedule_started_at = None
         self._last_cwu_circulation_on = cwu_circulation_on
 
     def _update_output_status(self, decision: AutomationDecision, schedule: ScheduleDecision, manual: ManualControlDecision) -> None:
