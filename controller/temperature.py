@@ -32,9 +32,8 @@ class TemperatureSensor:
             self._mark_success(value)
             return value
 
-        sensor_file = self.config.sensor_file or self._discover_sensor_file()
-
         try:
+            sensor_file = self.config.sensor_file or self._discover_sensor_file()
             value = self._read_ds18b20(sensor_file)
         except (SensorNotFoundError, InvalidMeasurementError, SensorTimeoutError) as exc:
             return self._handle_failed_read(exc)
