@@ -95,6 +95,17 @@
     </div>
     <div id="manualMessage" class="muted"></div>
   </section>
+  <section>
+    <div class="schedule-head"><h2>Ustawienia automatyki</h2><button id="saveAutomation">Zapisz</button></div>
+    <div class="grid">
+      <label>Próg ładowania bojlera [°C]<br><input id="loadingTemp" type="number" min="-55" max="125" step="0.1"></label>
+      <label>Czas ładowania bojlera [s]<br><input id="loadingSeconds" type="number" min="1" max="86400"></label>
+      <label>Ponowne sprawdzenie [s]<br><input id="loadingRecheck" type="number" min="1" max="604800"></label>
+      <label>Próg niskiego pelletu [%]<br><input id="pelletLow" type="number" min="0" max="100" step="0.1"></label>
+    </div>
+    <p class="muted">Zmiana jest zapisywana do konfiguracji runtime. Sterownik zastosuje ją w kolejnym cyklu.</p>
+    <div id="automationSaveStatus" class="muted"></div>
+  </section>
   <section><h2>Historia</h2><svg id="chart" viewBox="0 0 1000 230" preserveAspectRatio="none"></svg></section>
   <section>
     <div class="schedule-head"><h2>Harmonogram</h2><button id="save">Zapisz</button></div>
@@ -130,12 +141,33 @@ async function stopManual(output){try{await json('/api/manual/deactivate/'+outpu
 document.querySelectorAll('[data-manual]').forEach(b=>b.onclick=()=>activateManual(b.dataset.manual,b.dataset.minutes));
 document.querySelectorAll('[data-stop]').forEach(b=>b.onclick=()=>stopManual(b.dataset.stop));
 clearManual.onclick=async()=>{try{await json('/api/manual/clear',{method:'POST'});manualMessage.textContent='Wszystkie polecenia ręczne wyłączone.';await refresh()}catch(err){manualMessage.textContent='Błąd: '+err.message}};
+async function loadAutomationSettings(){
+  try{
+    const s=await json('/api/automation-settings');
+    loadingTemp.value=s.boiler_loading_temperature_c;
+    loadingSeconds.value=s.boiler_loading_seconds;
+    loadingRecheck.value=s.boiler_loading_recheck_seconds;
+    pelletLow.value=s.pellet_low_level_percent;
+  }catch(err){automationSaveStatus.textContent='Błąd odczytu: '+err.message}
+}
+saveAutomation.onclick=async()=>{
+  try{
+    const payload={
+      boiler_loading_temperature_c:Number(loadingTemp.value),
+      boiler_loading_seconds:Number(loadingSeconds.value),
+      boiler_loading_recheck_seconds:Number(loadingRecheck.value),
+      pellet_low_level_percent:Number(pelletLow.value)
+    };
+    await json('/api/automation-settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    automationSaveStatus.textContent='Zapisano ustawienia automatyki.';
+  }catch(err){automationSaveStatus.textContent='Błąd zapisu: '+err.message}
+};
 function draw(rows){const svg=document.getElementById('chart');if(rows.length<2){svg.innerHTML='';return} const vals=rows.flatMap(x=>[x.pipe_temperature_c,x.pellet_level_percent]).filter(x=>x!=null);const min=Math.min(...vals),max=Math.max(...vals);const pts=(key)=>rows.map((r,i)=>`${i*1000/(rows.length-1)},${215-(r[key]-min)*190/Math.max(1,max-min)}`).join(' ');svg.innerHTML=`<polyline fill="none" stroke="#f97316" stroke-width="4" points="${pts('pipe_temperature_c')}"/><polyline fill="none" stroke="#22c55e" stroke-width="4" points="${pts('pellet_level_percent')}"/><text x="15" y="22" fill="#f97316">temperatura</text><text x="130" y="22" fill="#22c55e">pellet</text>`}
 function renderSchedule(){timezone.value=schedule.timezone;schedules.innerHTML=scheduleDefs.map(([key,title])=>{const o=schedule[key]||{enabled:false,windows:[]};return `<div class="card" data-key="${key}" style="margin-top:12px"><label><input type="checkbox" class="enabled" ${o.enabled?'checked':''}> <strong>${title}</strong></label><div class="rows">${(o.windows||[]).map(rowHtml).join('')}</div><button class="add" type="button">Dodaj okno</button></div>`}).join('');document.querySelectorAll('.add').forEach(b=>b.onclick=()=>{b.parentElement.querySelector('.rows').insertAdjacentHTML('beforeend',rowHtml({start:'06:00',end:'06:10',weekdays:['mon','tue','wed','thu','fri']}))});document.querySelectorAll('.remove').forEach(bindRemove)}
 function rowHtml(w){return `<div class="schedule-row"><input class="start" type="time" value="${w.start}"><input class="end" type="time" value="${w.end}"><input class="days" value="${w.weekdays.join(',')}"><button class="remove" type="button">Usuń</button></div>`}
 function bindRemove(b){b.onclick=()=>b.parentElement.remove()}
 document.addEventListener('click',e=>{if(e.target.classList.contains('remove'))e.target.parentElement.remove()});
 save.onclick=async()=>{try{const payload={timezone:timezone.value};document.querySelectorAll('[data-key]').forEach(c=>{payload[c.dataset.key]={enabled:c.querySelector('.enabled').checked,windows:[...c.querySelectorAll('.schedule-row')].map(r=>({start:r.querySelector('.start').value,end:r.querySelector('.end').value,weekdays:r.querySelector('.days').value.split(',').map(x=>x.trim()).filter(Boolean)}))}});schedule=await json('/api/schedule',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});saveStatus.textContent='Zapisano. Sterownik odczyta zmianę automatycznie.';renderSchedule()}catch(err){saveStatus.textContent='Błąd: '+err.message}};
-(async()=>{schedule=await json('/api/schedule');renderSchedule();refresh();setInterval(refresh,5000)})();
+(async()=>{schedule=await json('/api/schedule');renderSchedule();await loadAutomationSettings();refresh();setInterval(refresh,5000)})();
 </script>
 </body></html>
