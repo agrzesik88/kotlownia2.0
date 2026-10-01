@@ -6,6 +6,7 @@ from controller.main import ControllerApplication
 
 def test_one_simulation_cycle_writes_state(tmp_path: Path) -> None:
     config = load_config()
+    object.__setattr__(config.application, "simulation", True)
     object.__setattr__(config.application, "state_file", tmp_path / "state.json")
     object.__setattr__(config.history, "database_file", tmp_path / "history.db")
     object.__setattr__(config.history, "sample_interval_seconds", 0.0)
