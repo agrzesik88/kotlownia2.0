@@ -169,7 +169,7 @@ async function activateManual(button,output,minutes){
  const statusMap={cwu_circulation:'cwuManualStatus',boiler_loading:'boilerManualStatus',other:'otherManualStatus',pellet_boiler_power_on:'powerManualStatus',pellet_boiler_power_off:'powerManualStatus'};
  const status=document.getElementById(statusMap[output]);
  button.disabled=true;status.textContent='Wysyłanie…';status.className='manual-status manual-pending';
- try{await json('/api/manual/activate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({output,duration_minutes:Number(minutes)})});manualMessage.textContent='Polecenie przyjęte. Sterownik zastosuje je w najbliższym cyklu.';manualMessage.className='muted';await refresh()}
+ try{await json('/api/manual/activate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({output,duration_minutes:Number(minutes)})});manualMessage.textContent='Polecenie przyjęte. Sterownik zastosuje je w najbliższym cyklu.';manualMessage.className='muted'}
  catch(err){status.textContent='Błąd wysyłania';status.className='manual-status save-error';manualMessage.textContent='Błąd: '+err.message;manualMessage.className='save-error'}
  finally{button.disabled=false}
 }
@@ -177,7 +177,7 @@ async function stopManual(button,output){
  const statusMap={cwu_circulation:'cwuManualStatus',boiler_loading:'boilerManualStatus',other:'otherManualStatus',pellet_boiler_power:'powerManualStatus'};
  const status=document.getElementById(statusMap[output]);
  button.disabled=true;status.textContent='Wyłączanie…';status.className='manual-status manual-pending';
- try{await json('/api/manual/deactivate/'+output,{method:'POST'});manualMessage.textContent='Polecenie wyłączenia przyjęte.';manualMessage.className='muted';await refresh()}
+ try{await json('/api/manual/deactivate/'+output,{method:'POST'});manualMessage.textContent='Polecenie wyłączenia przyjęte.';manualMessage.className='muted'}
  catch(err){status.textContent='Błąd wyłączania';status.className='manual-status save-error';manualMessage.textContent='Błąd: '+err.message;manualMessage.className='save-error'}
  finally{button.disabled=false}
 }
