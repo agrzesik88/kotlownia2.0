@@ -168,9 +168,9 @@ async function refresh(){try{const [s,h,e,a,al,ss]=await Promise.all([json('/api
 function renderManualState(s){
  const activeClass=(active)=>'manual-status '+(active?'on':'');
  const timed=(until)=>until?' - aktualne do '+new Date(until).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}):'';
- cwuManualStatus.textContent=s.cwu_manual_active?'Włączone ręcznie':(s.cwu_manual_until?'Włączone ręcznie'+timed(s.cwu_manual_until):'Nieaktywne');
- otherManualStatus.textContent=s.other_manual_active?'Włączone ręcznie':(s.other_manual_until?'Włączone ręcznie'+timed(s.other_manual_until):'Nieaktywne');
- boilerManualStatus.textContent=s.boiler_loading_manual_active?'Włączone ręcznie':(s.boiler_loading_manual_until?'Włączone ręcznie'+timed(s.boiler_loading_manual_until):'Nieaktywne');
+ cwuManualStatus.textContent=s.cwu_manual_until?'Włączone ręcznie'+timed(s.cwu_manual_until):(s.cwu_manual_active?'Włączone ręcznie':'Nieaktywne');
+ otherManualStatus.textContent=s.other_manual_until?'Włączone ręcznie'+timed(s.other_manual_until):(s.other_manual_active?'Włączone ręcznie':'Nieaktywne');
+ boilerManualStatus.textContent=s.boiler_loading_manual_until?'Włączone ręcznie'+timed(s.boiler_loading_manual_until):(s.boiler_loading_manual_active?'Włączone ręcznie':'Nieaktywne');
  powerManualStatus.textContent=s.pellet_boiler_power_manual_active?(s.pellet_boiler_power_manual_override?'Włączone ręcznie':'Wyłączone ręcznie'):'Automatyka';
  cwuManualStatus.className=activeClass(s.cwu_manual_active);
  otherManualStatus.className=activeClass(s.other_manual_active);
