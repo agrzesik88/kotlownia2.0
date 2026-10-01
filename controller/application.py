@@ -201,7 +201,6 @@ class ControllerApplication:
             self.state.last_error = None
             self._publish_recovery_if_needed()
             self._update_pellet_events(now, pellet_level, decision.pellet_low)
-            self._update_alerts()
         except Exception as exc:
             decision = self.automation.fail_safe(str(exc))
             self.relays.apply(
@@ -240,6 +239,7 @@ class ControllerApplication:
                 self.pellet.consecutive_failures
             )
             self.state.pellet_sensor_stale = self.pellet.using_last_good_value
+            self._update_alerts()
             self._copy_relay_state()
             self.state.update_timestamp()
             self.state.save(self.config.application.state_file)
