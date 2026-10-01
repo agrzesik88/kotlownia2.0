@@ -56,7 +56,7 @@ class OutputSchedule:
 class ScheduleConfig:
     timezone: str = "Europe/Warsaw"
     cwu_circulation: OutputSchedule = field(default_factory=OutputSchedule)
-    electric_heater: OutputSchedule = field(default_factory=OutputSchedule)
+    other: OutputSchedule = field(default_factory=OutputSchedule)
 
     def __post_init__(self) -> None:
         ZoneInfo(self.timezone)
@@ -68,7 +68,7 @@ class ScheduleConfig:
 @dataclass(frozen=True, slots=True)
 class ScheduleDecision:
     cwu_circulation_requested: bool
-    electric_heater_requested: bool
+    other_requested: bool
 
 
 class ScheduleRepository:
@@ -110,7 +110,7 @@ class TimeScheduler:
         local_now = now.astimezone(zone) if now is not None else datetime.now(zone)
         return ScheduleDecision(
             cwu_circulation_requested=self._config.cwu_circulation.active_at(local_now),
-            electric_heater_requested=self._config.electric_heater.active_at(local_now),
+            other_requested=self._config.other.active_at(local_now),
         )
 
 def schedule_from_dict(raw: dict[str, Any]) -> ScheduleConfig:
@@ -143,7 +143,7 @@ def schedule_from_dict(raw: dict[str, Any]) -> ScheduleConfig:
     return ScheduleConfig(
         timezone=str(raw.get("timezone", "Europe/Warsaw")),
         cwu_circulation=output("cwu_circulation"),
-        electric_heater=output("electric_heater"),
+        other=output("other"),
     )
 
 
