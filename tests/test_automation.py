@@ -15,7 +15,6 @@ def make_input(
         pellet_level_percent=pellet_level_percent,
         pellet_heating_detected=pellet_heating_detected,
         monotonic_seconds=monotonic_seconds,
-        other_requested=other_requested,
     )
 
 
@@ -117,38 +116,6 @@ def test_recheck_does_not_load_when_temperature_is_below_threshold() -> None:
     assert decision.state is BoilerState.IDLE
 
 
-def test_other_can_run_together_with_loading_pump() -> None:
-    controller = AutomationController()
-    decision = controller.evaluate(
-        make_input(
-            pipe_temperature_c=50,
-            pellet_heating_detected=True,
-            monotonic_seconds=100,
-            other_requested=True,
-        )
-    )
-    assert decision.boiler_loading_on
-    assert decision.other_on
-
-
-def test_other_can_start_after_loading_finishes() -> None:
-    controller = AutomationController(boiler_loading_seconds=600.0)
-    controller.evaluate(
-        make_input(pipe_temperature_c=50, pellet_heating_detected=True, monotonic_seconds=100)
-    )
-    decision = controller.evaluate(
-        make_input(
-            pipe_temperature_c=50,
-            pellet_heating_detected=True,
-            monotonic_seconds=700,
-            other_requested=True,
-        )
-    )
-    assert not decision.boiler_loading_on
-    assert decision.other_on
-    assert decision.state is BoilerState.OTHER
-
-
 def test_low_pellet_flag_uses_configured_threshold() -> None:
     controller = AutomationController(pellet_low_level_percent=15.0)
     decision = controller.evaluate(make_input(pellet_level_percent=15.0))
@@ -171,34 +138,18 @@ def test_fail_safe_turns_other_and_loading_off() -> None:
     assert decision.pellet_boiler_power_on
 
 
-def test_cwu_schedule_request_is_forwarded_to_decision() -> None:
+def test_automation_controls_only_boiler_loading_pump() -> None:
     controller = AutomationController()
     decision = controller.evaluate(
-        AutomationInput(
-            pipe_temperature_c=20.0,
-            pellet_level_percent=75.0,
-            pellet_heating_detected=False,
-            monotonic_seconds=1.0,
-            cwu_circulation_requested=True,
+        make_input(
+            pipe_temperature_c=50.0,
+            pellet_heating_detected=True,
+            monotonic_seconds=100.0,
         )
     )
-    assert decision.cwu_circulation_on is True
-
-
-def test_manual_boiler_loading_does_not_disable_other() -> None:
-    controller = AutomationController()
-    decision = controller.evaluate(
-        AutomationInput(
-            pipe_temperature_c=20.0,
-            pellet_level_percent=75.0,
-            pellet_heating_detected=False,
-            monotonic_seconds=1.0,
-            other_requested=True,
-            boiler_loading_requested=True,
-        )
-    )
-    assert decision.boiler_loading_on is True
-    assert decision.other_on is True
+    assert decision.boiler_loading_on
+    assert not decision.cwu_circulation_on
+    assert not decision.other_on
 
 
 def test_pellet_boiler_power_can_be_overridden_off() -> None:
