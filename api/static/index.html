@@ -167,10 +167,10 @@ async function refresh(){try{const [s,h,e,a,al,ss]=await Promise.all([json('/api
  outputsEl=document.getElementById('outputs');outputsEl.innerHTML=Object.entries(a.outputs).map(([key,o])=>`<div class="output-card"><div class="output-head"><strong>${outputNames[key]||key}</strong><span class="output-state ${o.state==='ON'?'on':''}">${o.state}</span></div><div class="output-mode">Żądanie: ${o.requested||o.state} · Tryb: ${o.mode}</div><div class="output-reason">${o.reason}</div></div>`).join('');renderManualState(s);draw(h);events.innerHTML=e.map(x=>`<tr><td>${new Date(x.occurred_at).toLocaleString()}</td><td>${x.event_type}</td><td>${x.message}</td></tr>`).join('');scheduleStatus=ss;updateScheduleStatus();}catch(err){updated.textContent='Błąd połączenia: '+err.message}}
 function renderManualState(s){
  const activeClass=(active)=>'manual-status '+(active?'on':'');
- const timed=(until)=>until?' do '+new Date(until).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}):'';
- cwuManualStatus.textContent=s.cwu_manual_active?'Włączone ręcznie':(s.cwu_manual_until?'Czasowe'+timed(s.cwu_manual_until):'Nieaktywne');
- otherManualStatus.textContent=s.other_manual_active?'Włączone ręcznie':(s.other_manual_until?'Czasowe'+timed(s.other_manual_until):'Nieaktywne');
- boilerManualStatus.textContent=s.boiler_loading_manual_active?'Włączone ręcznie':(s.boiler_loading_manual_until?'Czasowe'+timed(s.boiler_loading_manual_until):'Nieaktywne');
+ const timed=(until)=>until?' - aktualne do '+new Date(until).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}):'';
+ cwuManualStatus.textContent=s.cwu_manual_active?'Włączone ręcznie':(s.cwu_manual_until?'Włączone ręcznie'+timed(s.cwu_manual_until):'Nieaktywne');
+ otherManualStatus.textContent=s.other_manual_active?'Włączone ręcznie':(s.other_manual_until?'Włączone ręcznie'+timed(s.other_manual_until):'Nieaktywne');
+ boilerManualStatus.textContent=s.boiler_loading_manual_active?'Włączone ręcznie':(s.boiler_loading_manual_until?'Włączone ręcznie'+timed(s.boiler_loading_manual_until):'Nieaktywne');
  powerManualStatus.textContent=s.pellet_boiler_power_manual_active?(s.pellet_boiler_power_manual_override?'Włączone ręcznie':'Wyłączone ręcznie'):'Automatyka';
  cwuManualStatus.className=activeClass(s.cwu_manual_active);
  otherManualStatus.className=activeClass(s.other_manual_active);
