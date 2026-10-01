@@ -20,7 +20,7 @@ class OutputPin(Protocol):
 class RelayState:
     cwu_circulation_on: bool = False
     boiler_loading_on: bool = False
-    electric_heater_on: bool = False
+    other_on: bool = False
     pellet_boiler_power_on: bool = True
 
 
@@ -35,7 +35,7 @@ class RelayController:
         self._applied: dict[str, bool | None] = {
             "cwu": None,
             "loading": None,
-            "heater": None,
+            "other": None,
             "pellet_power": None,
         }
         self._closed = False
@@ -60,7 +60,7 @@ class RelayController:
         self._pins = {
             "cwu": OutputDevice(self.config.cwu_circulation_gpio, **common),
             "loading": OutputDevice(self.config.boiler_loading_gpio, **common),
-            "heater": OutputDevice(self.config.electric_heater_gpio, **common),
+            "other": OutputDevice(self.config.other_gpio, **common),
             "pellet_power": OutputDevice(self.config.pellet_boiler_power_gpio, **common),
         }
 
@@ -99,9 +99,9 @@ class RelayController:
         self.state.boiler_loading_on = enabled
         return changed
 
-    def set_electric_heater(self, enabled: bool) -> bool:
-        changed = self._set("heater", "Grzałka elektryczna", enabled)
-        self.state.electric_heater_on = enabled
+    def set_other(self, enabled: bool) -> bool:
+        changed = self._set("other", "Inne", enabled)
+        self.state.other_on = enabled
         return changed
 
     def set_pellet_boiler_power(self, enabled: bool) -> bool:
@@ -114,18 +114,18 @@ class RelayController:
         *,
         cwu_circulation_on: bool,
         boiler_loading_on: bool,
-        electric_heater_on: bool,
+        other_on: bool,
         pellet_boiler_power_on: bool,
     ) -> bool:
-        if boiler_loading_on and electric_heater_on:
+        if boiler_loading_on and other_on:
             raise ValueError(
-                "Pompa ładująca i grzałka nie mogą pracować równocześnie"
+                "Pompa ładująca i inne nie mogą pracować równocześnie"
             )
 
         changed = False
         changed |= self.set_cwu_circulation(cwu_circulation_on)
         changed |= self.set_boiler_loading(boiler_loading_on)
-        changed |= self.set_electric_heater(electric_heater_on)
+        changed |= self.set_other(other_on)
         changed |= self.set_pellet_boiler_power(pellet_boiler_power_on)
         return changed
 
@@ -133,7 +133,7 @@ class RelayController:
         return self.apply(
             cwu_circulation_on=False,
             boiler_loading_on=False,
-            electric_heater_on=False,
+            other_on=False,
             pellet_boiler_power_on=True,
         )
 
