@@ -17,7 +17,12 @@
     section { margin-top: 18px; }
     .outputs { display: flex; flex-wrap: wrap; gap: 10px; }
     .pill { padding: 7px 11px; border-radius: 999px; background: #374151; }
-    .on { background: #166534; }
+     .on { background: #166534; }
+    .save-success { margin-top:10px; padding:10px 12px; border-radius:8px; background:#166534; color:#dcfce7; font-weight:600; }
+    .save-error { margin-top:10px; padding:10px 12px; border-radius:8px; background:#7f1d1d; color:#fee2e2; font-weight:600; }
+    .chart-wrap { position:relative; }
+    .chart-grid { stroke:#475569; stroke-width:1; stroke-dasharray:4 4; }
+    .chart-axis-label { font-size:13px; fill:#94a3b8; }
     .error { background: #7f1d1d; }
     svg { width: 100%; height: 230px; background: #111827; border-radius: 10px; }
     table { width: 100%; border-collapse: collapse; }
@@ -104,15 +109,15 @@
       <label>Próg niskiego pelletu [%]<br><input id="pelletLow" type="number" min="0" max="100" step="0.1"></label>
     </div>
     <p class="muted">Zmiana jest zapisywana do konfiguracji runtime. Sterownik zastosuje ją w kolejnym cyklu.</p>
-    <div id="automationSaveStatus" class="muted"></div>
+    <div id="automationSaveStatus"></div>
   </section>
-  <section><h2>Historia</h2><svg id="chart" viewBox="0 0 1000 230" preserveAspectRatio="none"></svg></section>
+  <section><h2>Historia</h2><div class="chart-wrap"><svg id="chart" viewBox="0 0 1000 230" preserveAspectRatio="none"></svg></div></section>
   <section>
     <div class="schedule-head"><h2>Harmonogram</h2><button id="save">Zapisz</button></div>
     <label>Strefa czasowa <input id="timezone" value="Europe/Warsaw"></label>
     <div id="schedules"></div>
     <p class="muted">Dni: mon,tue,wed,thu,fri,sat,sun. Okno może przechodzić przez północ.</p>
-    <div id="saveStatus" class="muted"></div>
+    <div id="saveStatus"></div>
   </section>
   <section><h2>Ostatnie zdarzenia</h2><table><thead><tr><th>Czas</th><th>Typ</th><th>Opis</th></tr></thead><tbody id="events"></tbody></table></section>
 </main>
@@ -148,7 +153,7 @@ async function loadAutomationSettings(){
     loadingMinutes.value=s.boiler_loading_minutes;
     loadingRecheckMinutes.value=s.boiler_loading_recheck_minutes;
     pelletLow.value=s.pellet_low_level_percent;
-  }catch(err){automationSaveStatus.textContent='Błąd odczytu: '+err.message}
+  }catch(err){automationSaveStatus.textContent='Błąd odczytu: '+err.message;automationSaveStatus.className='save-error'}
 }
 saveAutomation.onclick=async()=>{
   try{
@@ -159,15 +164,29 @@ saveAutomation.onclick=async()=>{
       pellet_low_level_percent:Number(pelletLow.value)
     };
     await json('/api/automation-settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-    automationSaveStatus.textContent='Zapisano ustawienia automatyki.';
-  }catch(err){automationSaveStatus.textContent='Błąd zapisu: '+err.message}
+    automationSaveStatus.textContent='Zapisano ustawienia automatyki.';automationSaveStatus.className='save-success';
+  }catch(err){automationSaveStatus.textContent='Błąd zapisu: '+err.message;automationSaveStatus.className='save-error'}
 };
-function draw(rows){const svg=document.getElementById('chart');if(rows.length<2){svg.innerHTML='';return} const vals=rows.flatMap(x=>[x.pipe_temperature_c,x.pellet_level_percent]).filter(x=>x!=null);const min=Math.min(...vals),max=Math.max(...vals);const pts=(key)=>rows.map((r,i)=>`${i*1000/(rows.length-1)},${215-(r[key]-min)*190/Math.max(1,max-min)}`).join(' ');svg.innerHTML=`<polyline fill="none" stroke="#f97316" stroke-width="4" points="${pts('pipe_temperature_c')}"/><polyline fill="none" stroke="#22c55e" stroke-width="4" points="${pts('pellet_level_percent')}"/><text x="15" y="22" fill="#f97316">temperatura</text><text x="130" y="22" fill="#22c55e">pellet</text>`}
+function draw(rows){
+ const svg=document.getElementById('chart');
+ if(rows.length<2){svg.innerHTML='';return}
+ const width=1000,height=230,left=55,right=15,top=15,bottom=28;
+ const plotW=width-left-right,plotH=height-top-bottom;
+ const temp=rows.map(x=>x.pipe_temperature_c).filter(x=>x!=null);
+ const pellet=rows.map(x=>x.pellet_level_percent).filter(x=>x!=null);
+ const tempMin=temp.length?Math.min(...temp):0,tempMax=temp.length?Math.max(...temp):1;
+ const yMin=Math.floor(Math.min(tempMin,0)),yMax=Math.ceil(Math.max(tempMax,100));
+ const y=(v)=>top+plotH-(v-yMin)*plotH/Math.max(1,yMax-yMin);
+ const x=(i)=>left+i*plotW/(rows.length-1);
+ const pts=(key)=>rows.map((r,i)=>r[key]==null?'':`${x(i)},${y(r[key])}`).filter(Boolean).join(' ');
+ const grid=Array.from({length:6},(_,i)=>{const v=yMin+(yMax-yMin)*i/5;return `<line class="chart-grid" x1="${left}" x2="${width-right}" y1="${y(v)}" y2="${y(v)}"/><text class="chart-axis-label" x="5" y="${y(v)+4}">${v.toFixed(0)}</text>`}).join('');
+ svg.innerHTML=`${grid}<polyline fill="none" stroke="#f97316" stroke-width="4" points="${pts('pipe_temperature_c')}"/><polyline fill="none" stroke="#22c55e" stroke-width="4" points="${pts('pellet_level_percent')}"/><text x="${left+10}" y="13" fill="#f97316">temperatura [°C]</text><text x="${left+150}" y="13" fill="#22c55e">pellet [%]</text>`;
+}
 function renderSchedule(){timezone.value=schedule.timezone;schedules.innerHTML=scheduleDefs.map(([key,title])=>{const o=schedule[key]||{enabled:false,windows:[]};return `<div class="card" data-key="${key}" style="margin-top:12px"><label><input type="checkbox" class="enabled" ${o.enabled?'checked':''}> <strong>${title}</strong></label><div class="rows">${(o.windows||[]).map(rowHtml).join('')}</div><button class="add" type="button">Dodaj okno</button></div>`}).join('');document.querySelectorAll('.add').forEach(b=>b.onclick=()=>{b.parentElement.querySelector('.rows').insertAdjacentHTML('beforeend',rowHtml({start:'06:00',end:'06:10',weekdays:['mon','tue','wed','thu','fri']}))});document.querySelectorAll('.remove').forEach(bindRemove)}
 function rowHtml(w){return `<div class="schedule-row"><input class="start" type="time" value="${w.start}"><input class="end" type="time" value="${w.end}"><input class="days" value="${w.weekdays.join(',')}"><button class="remove" type="button">Usuń</button></div>`}
 function bindRemove(b){b.onclick=()=>b.parentElement.remove()}
 document.addEventListener('click',e=>{if(e.target.classList.contains('remove'))e.target.parentElement.remove()});
-save.onclick=async()=>{try{const payload={timezone:timezone.value};document.querySelectorAll('[data-key]').forEach(c=>{payload[c.dataset.key]={enabled:c.querySelector('.enabled').checked,windows:[...c.querySelectorAll('.schedule-row')].map(r=>({start:r.querySelector('.start').value,end:r.querySelector('.end').value,weekdays:r.querySelector('.days').value.split(',').map(x=>x.trim()).filter(Boolean)}))}});schedule=await json('/api/schedule',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});saveStatus.textContent='Zapisano. Sterownik odczyta zmianę automatycznie.';renderSchedule()}catch(err){saveStatus.textContent='Błąd: '+err.message}};
+save.onclick=async()=>{try{const payload={timezone:timezone.value};document.querySelectorAll('[data-key]').forEach(c=>{payload[c.dataset.key]={enabled:c.querySelector('.enabled').checked,windows:[...c.querySelectorAll('.schedule-row')].map(r=>({start:r.querySelector('.start').value,end:r.querySelector('.end').value,weekdays:r.querySelector('.days').value.split(',').map(x=>x.trim()).filter(Boolean)}))}});schedule=await json('/api/schedule',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});saveStatus.textContent='Zapisano ustawienia harmonogramu.';saveStatus.className='save-success';renderSchedule()}catch(err){saveStatus.textContent='Błąd zapisu: '+err.message;saveStatus.className='save-error'}};
 (async()=>{schedule=await json('/api/schedule');renderSchedule();await loadAutomationSettings();refresh();setInterval(refresh,5000)})();
 </script>
 </body></html>
