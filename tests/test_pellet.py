@@ -108,8 +108,8 @@ def test_successful_read_resets_failure_counter() -> None:
 def test_small_level_changes_within_tolerance_are_ignored() -> None:
     backend = SequenceDistanceSensor(
         [0.57] * 5
+        + [0.568] * 5
         + [0.565] * 5
-        + [0.55] * 5
     )
     sensor = PelletSensor(
         hardware_config(level_tolerance_percent=0.5),
