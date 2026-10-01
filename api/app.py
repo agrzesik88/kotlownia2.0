@@ -25,8 +25,8 @@ class AutomationSettingsPayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     boiler_loading_temperature_c: float = Field(ge=-55.0, le=125.0)
-    boiler_loading_seconds: int = Field(gt=0, le=86400)
-    boiler_loading_recheck_seconds: int = Field(gt=0, le=604800)
+    boiler_loading_minutes: int = Field(gt=0, le=1440)
+    boiler_loading_recheck_minutes: int = Field(gt=0, le=10080)
     pellet_low_level_percent: float = Field(ge=0.0, le=100.0)
 
 
@@ -77,7 +77,7 @@ def create_app(config_path: str | Path = "config/settings.toml") -> FastAPI:
         path.parent.mkdir(parents=True, exist_ok=True)
         data = payload.model_dump()
         temporary = path.with_suffix(".tmp")
-        temporary.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+        temporary.write_text(json.dumps(runtime_data, ensure_ascii=False), encoding="utf-8")
         temporary.replace(path)
         return data
 
@@ -143,8 +143,8 @@ def create_app(config_path: str | Path = "config/settings.toml") -> FastAPI:
 def _read_automation_settings(config: ControllerConfig) -> dict[str, Any]:
     defaults = {
         "boiler_loading_temperature_c": config.automation.boiler_loading_temperature_c,
-        "boiler_loading_seconds": config.automation.boiler_loading_seconds,
-        "boiler_loading_recheck_seconds": config.automation.boiler_loading_recheck_seconds,
+        "boiler_loading_minutes": config.automation.boiler_loading_seconds // 60,
+        "boiler_loading_recheck_minutes": config.automation.boiler_loading_recheck_seconds // 60,
         "pellet_low_level_percent": config.automation.pellet_low_level_percent,
     }
     path = config.application.state_file.parent / "automation_settings.json"
