@@ -56,3 +56,18 @@ def test_manual_power_override_stays_active_until_explicitly_disabled(tmp_path: 
 
     repository.deactivate("pellet_boiler_power")
     assert repository.evaluate().pellet_boiler_power_override is None
+
+
+def test_timed_manual_control_expires(tmp_path: Path) -> None:
+    clock = Clock()
+    repository = ManualControlRepository(tmp_path / "manual.json", now=clock.now)
+
+    repository.activate("cwu_circulation", 5)
+    decision = repository.evaluate()
+    assert decision.cwu_circulation_requested is True
+    assert decision.cwu_circulation_until is not None
+
+    clock.value = datetime(2026, 7, 24, 12, 6, tzinfo=timezone.utc)
+    decision = repository.evaluate()
+    assert decision.cwu_circulation_requested is False
+    assert decision.cwu_circulation_until is None
