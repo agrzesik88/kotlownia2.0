@@ -49,9 +49,13 @@
     .manual-status { margin-top:10px; font-weight:600; }
     .manual-pending { margin-top:10px; padding:10px 12px; border-radius:8px; background:#1e3a8a; color:#dbeafe; font-weight:600; }
     button:disabled { opacity:.65; cursor:wait; }
-    .schedule-row { display:grid; grid-template-columns: 1fr 1fr 2fr auto; gap:8px; margin:8px 0; align-items:center; }
+    .schedule-row { display:grid; grid-template-columns: 1fr 1fr 1.3fr 1.3fr 3fr auto; gap:8px; margin:8px 0; align-items:end; }
+    .schedule-field { display:flex; flex-direction:column; gap:5px; font-size:.85rem; color:#cbd5e1; }
+    .schedule-days { display:flex; flex-wrap:wrap; gap:5px; }
+    .day-button { padding:8px 10px; background:#374151; }
+    .day-button.active { background:#1d4ed8; }
     .schedule-head { display:flex; align-items:center; justify-content:space-between; gap:15px; }
-    @media(max-width:700px){.schedule-row{grid-template-columns:1fr 1fr}.schedule-row input:last-of-type{grid-column:1/3}}
+    @media(max-width:900px){.schedule-row{grid-template-columns:1fr 1fr}.schedule-row .schedule-field:nth-child(n+3){grid-column:1/3}}
   </style>
 </head>
 <body>
@@ -133,9 +137,8 @@
   <section><h2>Historia</h2><div class="chart-wrap"><svg id="chart" viewBox="0 0 1000 270" preserveAspectRatio="none"></svg></div></section>
   <section>
     <div class="schedule-head"><h2>Harmonogram</h2><button id="save">Zapisz</button></div>
-    <label>Strefa czasowa <input id="timezone" value="Europe/Warsaw"></label>
     <div id="schedules"></div>
-    <p class="muted">Dni: mon,tue,wed,thu,fri,sat,sun. Okno może przechodzić przez północ.</p>
+    <p class="muted">Zakres określa, kiedy harmonogram może uruchamiać wyjście. W tym zakresie wyjście działa przez podany czas trwania i ponawia się zgodnie z ustawionym odstępem.</p>
     <div id="saveStatus"></div>
   </section>
   <section><h2>Ostatnie zdarzenia</h2><table><thead><tr><th>Czas</th><th>Typ</th><th>Opis</th></tr></thead><tbody id="events"></tbody></table></section>
@@ -232,11 +235,13 @@ function draw(rows){
  const lastLabels=`<circle cx="${x(rows.length-1)}" cy="${y(lastTemp)}" r="5" fill="#f97316"/><text class="chart-last-label" fill="#f97316" text-anchor="end" x="${x(rows.length-1)-10}" y="${y(lastTemp)-9}">${lastTemp==null?'—':Number(lastTemp).toFixed(1)+' °C'}</text><circle cx="${x(rows.length-1)}" cy="${y(lastPellet)}" r="5" fill="#22c55e"/><text class="chart-last-label" fill="#22c55e" text-anchor="end" x="${x(rows.length-1)-10}" y="${y(lastPellet)+18}">${lastPellet==null?'—':Number(lastPellet).toFixed(1)+' %'}</text>`;
  svg.innerHTML=`${grid}<polyline fill="none" stroke="#f97316" stroke-width="4" points="${pts('pipe_temperature_c')}"/><polyline fill="none" stroke="#22c55e" stroke-width="4" points="${pts('pellet_level_percent')}"/>${lastLabels}<text x="${left+10}" y="16" fill="#f97316">temperatura [°C]</text><text x="${left+150}" y="16" fill="#22c55e">pellet [%]</text>${timeLabels}`;
 }
-function renderSchedule(){timezone.value=schedule.timezone;schedules.innerHTML=scheduleDefs.map(([key,title])=>{const o=schedule[key]||{enabled:false,windows:[]};return `<div class="card" data-key="${key}" style="margin-top:12px"><label><input type="checkbox" class="enabled" ${o.enabled?'checked':''}> <strong>${title}</strong></label><div class="rows">${(o.windows||[]).map(rowHtml).join('')}</div><button class="add" type="button">Dodaj okno</button></div>`}).join('');document.querySelectorAll('.add').forEach(b=>b.onclick=()=>{b.parentElement.querySelector('.rows').insertAdjacentHTML('beforeend',rowHtml({start:'06:00',end:'06:10',weekdays:['mon','tue','wed','thu','fri']}))});document.querySelectorAll('.remove').forEach(bindRemove)}
-function rowHtml(w){return `<div class="schedule-row"><input class="start" type="time" value="${w.start}"><input class="end" type="time" value="${w.end}"><input class="days" value="${w.weekdays.join(',')}"><button class="remove" type="button">Usuń</button></div>`}
+const dayDefs=[['mon','Pon'],['tue','Wt'],['wed','Śr'],['thu','Czw'],['fri','Pt'],['sat','Sob'],['sun','Nd']];
+function renderSchedule(){schedules.innerHTML=scheduleDefs.map(([key,title])=>{const o=schedule[key]||{enabled:false,windows:[]};return `<div class="card" data-key="${key}" style="margin-top:12px"><label><input type="checkbox" class="enabled" ${o.enabled?'checked':''}> <strong>${title}</strong></label><div class="rows">${(o.windows||[]).map(rowHtml).join('')}</div><button class="add" type="button">Dodaj zakres</button></div>`}).join('');document.querySelectorAll('.add').forEach(b=>b.onclick=()=>{b.parentElement.querySelector('.rows').insertAdjacentHTML('beforeend',rowHtml({start:'06:00',end:'08:00',duration_minutes:10,repeat_minutes:60,weekdays:['mon','tue','wed','thu','fri']}));bindScheduleButtons()});bindScheduleButtons()}
+function rowHtml(w){const days=w.weekdays||['mon','tue','wed','thu','fri'];return `<div class="schedule-row"><label class="schedule-field">Start<input class="start" type="time" value="${w.start}"></label><label class="schedule-field">Koniec<input class="end" type="time" value="${w.end}"></label><label class="schedule-field">Czas trwania [min]<input class="duration" type="number" min="1" max="1440" value="${w.duration_minutes??10}"></label><label class="schedule-field">Ponowne uruchomienie po [min]<input class="repeat" type="number" min="1" max="10080" value="${w.repeat_minutes??60}"></label><div class="schedule-field">Dni<div class="schedule-days">${dayDefs.map(([key,label])=>`<button type="button" class="day-button ${days.includes(key)?'active':''}" data-day="${key}">${label}</button>`).join('')}</div></div><button class="remove secondary" type="button">Usuń</button></div>`}
+function bindScheduleButtons(){document.querySelectorAll('.day-button').forEach(b=>b.onclick=()=>b.classList.toggle('active'));document.querySelectorAll('.remove').forEach(bindRemove)}
 function bindRemove(b){b.onclick=()=>b.parentElement.remove()}
 document.addEventListener('click',e=>{if(e.target.classList.contains('remove'))e.target.parentElement.remove()});
-save.onclick=async()=>{try{const payload={timezone:timezone.value};document.querySelectorAll('[data-key]').forEach(c=>{payload[c.dataset.key]={enabled:c.querySelector('.enabled').checked,windows:[...c.querySelectorAll('.schedule-row')].map(r=>({start:r.querySelector('.start').value,end:r.querySelector('.end').value,weekdays:r.querySelector('.days').value.split(',').map(x=>x.trim()).filter(Boolean)}))}});schedule=await json('/api/schedule',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});saveStatus.textContent='Zapisano ustawienia harmonogramu.';saveStatus.className='save-success';renderSchedule()}catch(err){saveStatus.textContent='Błąd zapisu: '+err.message;saveStatus.className='save-error'}};
+save.onclick=async()=>{try{const payload={timezone:'Europe/Warsaw'};document.querySelectorAll('[data-key]').forEach(c=>{payload[c.dataset.key]={enabled:c.querySelector('.enabled').checked,windows:[...c.querySelectorAll('.schedule-row')].map(r=>({start:r.querySelector('.start').value,end:r.querySelector('.end').value,duration_minutes:Number(r.querySelector('.duration').value),repeat_minutes:Number(r.querySelector('.repeat').value),weekdays:[...r.querySelectorAll('.day-button.active')].map(b=>b.dataset.day)}))}});schedule=await json('/api/schedule',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});saveStatus.textContent='Zapisano ustawienia harmonogramu.';saveStatus.className='save-success';renderSchedule()}catch(err){saveStatus.textContent='Błąd zapisu: '+err.message;saveStatus.className='save-error'}};
 (async()=>{schedule=await json('/api/schedule');renderSchedule();await loadAutomationSettings();refresh();setInterval(refresh,5000)})();
 </script>
 </body></html>
