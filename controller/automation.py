@@ -171,7 +171,6 @@ class AutomationController:
             return self._decision(
                 pellet_low=pellet_low,
                 boiler_loading_on=True,
-                other_on=inputs.other_requested,
                 reason="Trwa czasowe ładowanie bojlera",
             )
 
@@ -179,15 +178,6 @@ class AutomationController:
         self._next_boiler_loading_check_at = (
             inputs.monotonic_seconds + self._boiler_loading_recheck_seconds
         )
-
-        # Po zakończeniu ładowania inne może wystartować w tym samym cyklu,
-        # ale nigdy równocześnie z pompą ładującą.
-        if inputs.other_requested:
-            self._state = BoilerState.OTHER
-            return self._decision(
-                pellet_low=pellet_low,
-                reason="Ładowanie zakończone",
-            )
 
         if inputs.pellet_heating_detected:
             self._state = BoilerState.PELLET_HEATING
