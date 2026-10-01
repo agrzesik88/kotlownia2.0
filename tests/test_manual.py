@@ -31,28 +31,28 @@ def test_manual_control_can_disable_one_output(tmp_path: Path) -> None:
     clock = Clock()
     repository = ManualControlRepository(tmp_path / "manual.json", now=clock.now)
     repository.activate("cwu_circulation", 10)
-    repository.activate("electric_heater", 30)
+    repository.activate("other", 30)
 
     repository.deactivate("cwu_circulation")
     decision = repository.evaluate()
     assert decision.cwu_circulation_requested is False
-    assert decision.electric_heater_requested is True
+    assert decision.other_requested is True
 
 
 def test_manual_control_rejects_unsafe_duration(tmp_path: Path) -> None:
     repository = ManualControlRepository(tmp_path / "manual.json")
     with pytest.raises(ValueError):
-        repository.activate("electric_heater", 121)
+        repository.activate("other", 121)
 
 
-def test_manual_boiler_loading_disables_heater_request(tmp_path: Path) -> None:
+def test_manual_boiler_loading_disables_other_request(tmp_path: Path) -> None:
     clock = Clock()
     repository = ManualControlRepository(tmp_path / "manual.json", now=clock.now)
-    repository.activate("electric_heater", 30)
+    repository.activate("other", 30)
     repository.activate("boiler_loading", 10)
     decision = repository.evaluate()
     assert decision.boiler_loading_requested is True
-    assert decision.electric_heater_requested is False
+    assert decision.other_requested is False
 
 
 def test_manual_power_override_can_force_off_and_expire(tmp_path: Path) -> None:

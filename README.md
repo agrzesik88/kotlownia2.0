@@ -8,10 +8,10 @@ Lokalny sterownik kotłowni dla Raspberry Pi. Automatyka działa niezależnie od
 - domyślny próg wynosi `45°C`,
 - pompa pracuje przez skonfigurowany czas, domyślnie `600 s` (10 minut),
 - po zakończeniu pracy kolejne sprawdzenie możliwości ładowania następuje po skonfigurowanej przerwie, domyślnie `3600 s` (1 godzina),
-- grzałka elektryczna nigdy nie może pracować równocześnie z pompą ładującą,
-- żądanie pracy grzałki jest przygotowane jako wejście dla przyszłego harmonogramu lub API; domyślnie jest wyłączone,
+- inne nigdy nie może pracować równocześnie z pompą ładującą,
+- żądanie pracy innego wyjścia jest przygotowane jako wejście dla przyszłego harmonogramu lub API; domyślnie jest wyłączone,
 - niski poziom pelletu ustawia alarm w stanie sterownika i może wysłać e-mail,
-- błąd czujnika przełącza automat w stan `ERROR`, wyłącza pompę ładującą i grzałkę.
+- błąd czujnika przełącza automat w stan `ERROR`, wyłącza pompę ładującą i inne wyjście.
 
 
 ## Architektura aplikacji
@@ -150,7 +150,7 @@ Zatrzymanie: `Ctrl+C`.
 ## Tryb sprzętowy
 
 `application.simulation` steruje wyjściami przekaźników. Czujniki mają własne flagi `simulation`.
-Przed fizycznym włączeniem wyjść sprawdź poziomy logiczne modułu przekaźników oraz zabezpieczenia elektryczne grzałki i pomp.
+Przed fizycznym włączeniem wyjść sprawdź poziomy logiczne modułu przekaźników oraz zabezpieczenia elektryczne innego wyjścia i pomp.
 
 ## Instalacja jako usługa systemd
 
@@ -212,7 +212,7 @@ Czujniki DS18B20 i HC-SR04 działają realnie, ale przekaźniki nie są fizyczni
 - Logi przekaźników pokazują wyłącznie rzeczywiste przejścia stanu.
 - Pierwsza inicjalizacja nadal wymusza pełny bezpieczny stan wyjść.
 - `close()` jest bezpieczne przy wielokrotnym wywołaniu.
-- Zachowana jest blokada jednoczesnej pracy pompy ładującej i grzałki.
+- Zachowana jest blokada jednoczesnej pracy pompy ładującej i innego wyjścia.
 
 ## Harmonogram i panel WWW — wersja 0.3.0
 
@@ -224,7 +224,7 @@ automatyki i jej zabezpieczeń.
 Obsługiwane są osobne okna dla:
 
 - pompy cyrkulacyjnej CWU,
-- grzałki elektrycznej.
+- innego wyjścia.
 
 Okna mają godzinę rozpoczęcia, zakończenia i wybrane dni tygodnia. Mogą przechodzić
 przez północ. Strefa czasowa domyślnie to `Europe/Warsaw`.
@@ -248,7 +248,7 @@ http://ADRES_IP_RASPBERRY:8088
 Nie przekierowuj portu `8088` na routerze. Pierwsza wersja panelu jest przeznaczona
 wyłącznie do zaufanej sieci LAN i nie ma jeszcze logowania użytkowników.
 
-Grzałka ma harmonogram domyślnie wyłączony. Nie włączaj jej czasowo, dopóki nie
+Inne ma harmonogram domyślnie wyłączony. Nie włączaj jej czasowo, dopóki nie
 potwierdzimy niezależnego termostatu, zabezpieczenia nadtemperaturowego i poprawnego
 okablowania stycznika. Harmonogram cyrkulacji CWU można bezpiecznie testować nadal
 w trybie `simulation = true`.
@@ -264,7 +264,7 @@ Przykładowy harmonogram znajduje się w `config/schedule.example.json`.
 
 ## Sterowanie ręczne — wersja 0.4.1
 
-Panel WWW umożliwia czasowe ręczne uruchomienie cyrkulacji CWU i grzałki
+Panel WWW umożliwia czasowe ręczne uruchomienie cyrkulacji CWU i innego wyjścia
 elektrycznej. Polecenia są zapisywane atomowo w `runtime/manual_control.json`,
 a główny sterownik odczytuje je w każdym cyklu. Panel WWW pozostaje osobną
 usługą i nie przełącza GPIO bezpośrednio.
@@ -272,7 +272,7 @@ usługą i nie przełącza GPIO bezpośrednio.
 Dostępne czasy z panelu:
 
 - cyrkulacja CWU: 5, 10, 20 lub 30 minut,
-- grzałka elektryczna: 15, 30 lub 60 minut.
+- inne: 15, 30 lub 60 minut.
 
 Każde polecenie ma czas wygaśnięcia zapisany w UTC. Po jego upływie sterownik
 automatycznie wraca do harmonogramu. Można też wyłączyć pojedyncze polecenie
@@ -288,9 +288,9 @@ command_file = "runtime/manual_control.json"
 ```
 
 Ręczne żądanie nadal przechodzi przez `AutomationController`, dlatego blokada
-jednoczesnej pracy pompy ładującej i grzałki pozostaje aktywna.
+jednoczesnej pracy pompy ładującej i innego wyjścia pozostaje aktywna.
 
 
 ## Sterowanie ręczne 0.4.1
 
-Panel WWW umożliwia czasowe sterowanie cyrkulacją CWU, grzałką elektryczną, pompą bojlera oraz wymuszenie włączenia lub wyłączenia zasilania pieca pelletowego. Pompa bojlera ma pierwszeństwo przed grzałką, a każde wymuszenie automatycznie wygasa.
+Panel WWW umożliwia czasowe sterowanie cyrkulacją CWU, innym wyjściem, pompą bojlera oraz wymuszenie włączenia lub wyłączenia zasilania pieca pelletowego. Pompa bojlera ma pierwszeństwo przed innym wyjściem, a każde wymuszenie automatycznie wygasa.

@@ -35,7 +35,7 @@ class SchedulePayload(BaseModel):
 
     timezone: str
     cwu_circulation: dict[str, Any]
-    electric_heater: dict[str, Any]
+    other: dict[str, Any]
 
 
 def create_app(config_path: str | Path = "config/settings.toml") -> FastAPI:
@@ -116,11 +116,11 @@ def create_app(config_path: str | Path = "config/settings.toml") -> FastAPI:
         decision = app.state.manual_repository.evaluate()
         return {
             "cwu_circulation_active": decision.cwu_circulation_requested,
-            "electric_heater_active": decision.electric_heater_requested,
+            "other_active": decision.other_requested,
             "boiler_loading_active": decision.boiler_loading_requested,
             "pellet_boiler_power_override": decision.pellet_boiler_power_override,
             "cwu_circulation_until": decision.cwu_circulation_until,
-            "electric_heater_until": decision.electric_heater_until,
+            "other_until": decision.other_until,
             "boiler_loading_until": decision.boiler_loading_until,
             "pellet_boiler_power_until": decision.pellet_boiler_power_until,
         }
@@ -204,7 +204,7 @@ def _read_history(config: ControllerConfig, limit: int) -> list[dict[str, Any]]:
             """
             SELECT recorded_at, pipe_temperature_c, pellet_level_percent,
                    automation_state, cwu_circulation_on, boiler_loading_on,
-                   electric_heater_on, pellet_boiler_power_on, last_error
+                   other_on, pellet_boiler_power_on, last_error
             FROM measurements
             ORDER BY id DESC
             LIMIT ?

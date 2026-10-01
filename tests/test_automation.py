@@ -8,14 +8,14 @@ def make_input(
     pellet_level_percent: float = 75.0,
     pellet_heating_detected: bool = False,
     monotonic_seconds: float = 0.0,
-    electric_heater_requested: bool = False,
+    other_requested: bool = False,
 ) -> AutomationInput:
     return AutomationInput(
         pipe_temperature_c=pipe_temperature_c,
         pellet_level_percent=pellet_level_percent,
         pellet_heating_detected=pellet_heating_detected,
         monotonic_seconds=monotonic_seconds,
-        electric_heater_requested=electric_heater_requested,
+        other_requested=other_requested,
     )
 
 
@@ -24,7 +24,7 @@ def test_boot_goes_to_idle() -> None:
     decision = controller.evaluate(make_input())
     assert decision.state is BoilerState.IDLE
     assert not decision.boiler_loading_on
-    assert not decision.electric_heater_on
+    assert not decision.other_on
 
 
 def test_rejects_invalid_sensor_values() -> None:
@@ -46,7 +46,7 @@ def test_loading_starts_at_45_degrees() -> None:
     )
     assert decision.state is BoilerState.BOILER_LOADING
     assert decision.boiler_loading_on
-    assert not decision.electric_heater_on
+    assert not decision.other_on
 
 
 def test_loading_runs_for_configured_ten_minutes() -> None:
@@ -117,21 +117,21 @@ def test_recheck_does_not_load_when_temperature_is_below_threshold() -> None:
     assert decision.state is BoilerState.IDLE
 
 
-def test_heater_never_runs_together_with_loading_pump() -> None:
+def test_other_never_runs_together_with_loading_pump() -> None:
     controller = AutomationController()
     decision = controller.evaluate(
         make_input(
             pipe_temperature_c=50,
             pellet_heating_detected=True,
             monotonic_seconds=100,
-            electric_heater_requested=True,
+            other_requested=True,
         )
     )
     assert decision.boiler_loading_on
-    assert not decision.electric_heater_on
+    assert not decision.other_on
 
 
-def test_heater_can_start_after_loading_finishes() -> None:
+def test_other_can_start_after_loading_finishes() -> None:
     controller = AutomationController(boiler_loading_seconds=600.0)
     controller.evaluate(
         make_input(pipe_temperature_c=50, pellet_heating_detected=True, monotonic_seconds=100)
@@ -141,12 +141,12 @@ def test_heater_can_start_after_loading_finishes() -> None:
             pipe_temperature_c=50,
             pellet_heating_detected=True,
             monotonic_seconds=700,
-            electric_heater_requested=True,
+            other_requested=True,
         )
     )
     assert not decision.boiler_loading_on
-    assert decision.electric_heater_on
-    assert decision.state is BoilerState.ELECTRIC_HEATING
+    assert decision.other_on
+    assert decision.state is BoilerState.OTHER
 
 
 def test_low_pellet_flag_uses_configured_threshold() -> None:
@@ -162,12 +162,12 @@ def test_monotonic_time_cannot_go_backwards() -> None:
         controller.evaluate(make_input(monotonic_seconds=9.0))
 
 
-def test_fail_safe_turns_heater_and_loading_off() -> None:
+def test_fail_safe_turns_other_and_loading_off() -> None:
     controller = AutomationController()
     decision = controller.fail_safe("awaria czujnika")
     assert decision.state is BoilerState.ERROR
     assert not decision.boiler_loading_on
-    assert not decision.electric_heater_on
+    assert not decision.other_on
     assert decision.pellet_boiler_power_on
 
 
@@ -185,7 +185,7 @@ def test_cwu_schedule_request_is_forwarded_to_decision() -> None:
     assert decision.cwu_circulation_on is True
 
 
-def test_manual_boiler_loading_has_priority_over_heater() -> None:
+def test_manual_boiler_loading_has_priority_over_other() -> None:
     controller = AutomationController()
     decision = controller.evaluate(
         AutomationInput(
@@ -193,12 +193,12 @@ def test_manual_boiler_loading_has_priority_over_heater() -> None:
             pellet_level_percent=75.0,
             pellet_heating_detected=False,
             monotonic_seconds=1.0,
-            electric_heater_requested=True,
+            other_requested=True,
             boiler_loading_requested=True,
         )
     )
     assert decision.boiler_loading_on is True
-    assert decision.electric_heater_on is False
+    assert decision.other_on is False
 
 
 def test_pellet_boiler_power_can_be_overridden_off() -> None:

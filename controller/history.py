@@ -34,7 +34,7 @@ class HistoryRepository:
                 automation_reason TEXT NOT NULL,
                 cwu_circulation_on INTEGER NOT NULL,
                 boiler_loading_on INTEGER NOT NULL,
-                electric_heater_on INTEGER NOT NULL,
+                other_on INTEGER NOT NULL,
                 pellet_boiler_power_on INTEGER NOT NULL,
                 simulation_mode INTEGER NOT NULL,
                 last_error TEXT
@@ -57,6 +57,17 @@ class HistoryRepository:
         )
         self._connection.commit()
 
+        # Migracja starszej bazy po zmianie nazwy wyjścia z grzałki na "Inne".
+        columns = {
+            row[1]
+            for row in self._connection.execute("PRAGMA table_info(measurements)").fetchall()
+        }
+        if "electric_heater_on" in columns and "other_on" not in columns:
+            self._connection.execute(
+                "ALTER TABLE measurements RENAME COLUMN electric_heater_on TO other_on"
+            )
+            self._connection.commit()
+
     def record_state(self, state: ControllerState) -> None:
         self._connection.execute(
             """
@@ -70,7 +81,7 @@ class HistoryRepository:
                 automation_reason,
                 cwu_circulation_on,
                 boiler_loading_on,
-                electric_heater_on,
+                other_on,
                 pellet_boiler_power_on,
                 simulation_mode,
                 last_error
@@ -86,7 +97,7 @@ class HistoryRepository:
                 state.automation_reason,
                 int(state.cwu_circulation_on),
                 int(state.boiler_loading_on),
-                int(state.electric_heater_on),
+                int(state.other_on),
                 int(state.pellet_boiler_power_on),
                 int(state.simulation_mode),
                 state.last_error,
